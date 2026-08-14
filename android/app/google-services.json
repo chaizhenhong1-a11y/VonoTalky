@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "223205643791",
+    "project_id": "lianxieryi",
+    "storage_bucket": "lianxieryi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:223205643791:android:c5e2662a5026fab22eb57a",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_23"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYONJrIfrlKIvbb7LnOZJGEI9wjY-19sg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:223205643791:android:33ed5e488635b3ea2eb57a",
+        "android_client_info": {
+          "package_name": "com.example.vonotalky"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYONJrIfrlKIvbb7LnOZJGEI9wjY-19sg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
