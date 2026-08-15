@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../../app/theme/app_colors.dart';
 import '../../../auth/data/services/auth_service.dart';
 import '../../../presence/data/services/presence_service.dart';
 import '../../data/services/profile_service.dart';
@@ -161,9 +160,6 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  static void _notice(BuildContext context, String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
 }
 
 class _TopProfile extends StatelessWidget {
@@ -320,9 +316,6 @@ class _TopProfile extends StatelessWidget {
     );
   }
 
-  static void _notice(BuildContext context, String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
 }
 
 class _Title extends StatelessWidget {

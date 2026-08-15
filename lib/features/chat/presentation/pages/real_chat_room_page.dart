@@ -13,6 +13,8 @@ import '../../data/services/chat_file_service.dart';
 import '../../data/services/chat_service.dart';
 import '../../data/services/chat_voice_service.dart';
 import '../../data/services/message_management_service.dart';
+import '../../data/services/pinned_message_service.dart';
+import '../widgets/pinned_message_banner.dart';
 import '../widgets/voice_message_bubble.dart';
 import '../widgets/file_message_bubble.dart';
 import '../widgets/message_reply_widgets.dart';
@@ -20,7 +22,7 @@ import '../widgets/recording_composer.dart';
 import '../widgets/chat_emoji_picker.dart';
 import '../../../contacts/presentation/pages/contact_detail_page.dart';
 import '../../../contacts/data/services/contact_detail_service.dart';
-import 'chat_search_page.dart';
+import 'advanced_chat_search_page.dart';
 import 'forward_message_page.dart';
 import 'media_viewer_page.dart';
 import 'saved_messages_page.dart';
@@ -42,6 +44,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   final voiceService = ChatVoiceService();
   final managementService = MessageManagementService();
   final contactDetailService = ContactDetailService();
+  final pinnedMessageService = PinnedMessageService();
   List<QueryDocumentSnapshot<Map<String, dynamic>>> latestMessages = const [];
   final Set<String> selectedMessageIds = {};
   final Set<String> knownMessageIds = {};
@@ -467,6 +470,20 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
             Container(
               color: _chatBackgroundColor,
               child: Column(children: [
+          PinnedMessageBanner(
+            title: 'Pinned Messages',
+            preferenceId: widget.user.uid,
+            stream: pinnedMessageService.directPreferences(widget.user.uid),
+            onTap: (messageId) => _jumpToMessage(
+              messageId,
+              latestMessages,
+            ),
+            onRemove: (messageId) =>
+                pinnedMessageService.removeDirect(
+                  widget.user.uid,
+                  messageId,
+                ),
+          ),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: service.messages(widget.user.uid),
@@ -1213,7 +1230,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     final messageId = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => ChatSearchPage(otherId: widget.user.uid),
+        builder: (_) => AdvancedChatSearchPage(otherId: widget.user.uid),
       ),
     );
     if (messageId != null && mounted) {
@@ -1521,6 +1538,12 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                 ),
                 const Divider(height: 22),
                 ListTile(
+                  leading: const Icon(Icons.push_pin_outlined),
+                  title: const Text('Pin message'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pop(sheetContext, 'pin'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.check_circle_outline_rounded),
                   title: const Text('Select messages'),
                   trailing: const Icon(Icons.chevron_right_rounded),
@@ -1599,6 +1622,18 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         ),
       );
       if (contactName != null) _notice('Forwarded to $contactName');
+    } else if (action == 'pin') {
+      try {
+        await pinnedMessageService.pinDirect(
+          otherId: widget.user.uid,
+          messageId: id,
+          data: data,
+          senderName: mine ? 'You' : widget.user.name,
+        );
+        _notice('Message pinned');
+      } catch (error) {
+        _notice('Pin failed: $error');
+      }
     } else if (action == 'select') {
       _toggleSelection(id);
     } else if (action == 'details') {

@@ -1,7 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../app/theme/app_colors.dart';
 import '../../../chat/data/models/chat_user.dart';
 import '../../../chat/data/services/chat_service.dart';
 import '../../../chat/presentation/pages/new_chat_page.dart';
@@ -23,7 +21,16 @@ class ChatHomePage extends StatefulWidget {
 class _ChatHomePageState extends State<ChatHomePage> {
   final service = ChatService();
   final contactService = ContactService();
+  final searchController = TextEditingController();
+  final searchFocusNode = FocusNode();
   String query = '';
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    searchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -61,7 +68,10 @@ class _ChatHomePageState extends State<ChatHomePage> {
                   onTap: () => _notice('Unread chats are shown below.'),
                 ),
                 IconButton(
-                  onPressed: () => _notice('Use the search bar below.'),
+                  tooltip: 'Search',
+                  onPressed: () {
+                    searchFocusNode.requestFocus();
+                  },
                   icon: const Icon(Icons.search_rounded),
                 ),
               ]),
@@ -69,11 +79,22 @@ class _ChatHomePageState extends State<ChatHomePage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
               child: TextField(
-                onChanged: (v) => setState(() => query = v.toLowerCase()),
+                controller: searchController,
+                focusNode: searchFocusNode,
+                textInputAction: TextInputAction.search,
+                onChanged: (value) {
+                  setState(() => query = value.trim().toLowerCase());
+                },
                 decoration: InputDecoration(
                   hintText: 'Search contacts or groups...',
-                  prefixIcon: Icon(Icons.search_rounded),
-                  suffixIcon: Icon(Icons.mic_none_rounded),
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: query.isEmpty
+                      ? const Icon(Icons.mic_none_rounded)
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: _clearSearch,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
                   filled: true,
                   fillColor: Colors.white,
                   isDense: true,
@@ -84,7 +105,9 @@ class _ChatHomePageState extends State<ChatHomePage> {
                 ),
               ),
             ),
-            const _SectionTitle('Top Contacts'),
+            _SectionTitle(
+              query.isEmpty ? 'Top Contacts' : 'Matching Contacts',
+            ),
             Expanded(
               child: Stack(
                 children: [
@@ -115,13 +138,31 @@ class _ChatHomePageState extends State<ChatHomePage> {
                       ),
                     );
                   }
-                  final users = snapshot.data!.take(10).toList();
+                  final contacts = snapshot.data!;
+                  final users = contacts
+                      .where(
+                        (user) =>
+                            query.isEmpty ||
+                            user.name.toLowerCase().contains(query) ||
+                            user.email.toLowerCase().contains(query),
+                      )
+                      .take(10)
+                      .toList();
+
                   if (users.isEmpty) {
-                    return const Align(
+                    return Align(
                       alignment: Alignment.centerLeft,
                       child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 18),
-                        child: Text('No contacts yet'),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Text(
+                          query.isEmpty
+                              ? 'No contacts yet'
+                              : 'No contacts match "$query"',
+                          style: const TextStyle(
+                            color: Color(0xFF756E7C),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     );
                   }
@@ -146,7 +187,9 @@ class _ChatHomePageState extends State<ChatHomePage> {
                 },
                       ),
                       ),
-                      const _SectionTitle('Recent Chats'),
+                      _SectionTitle(
+                        query.isEmpty ? 'Recent Chats' : 'Matching Chats',
+                      ),
                       Expanded(
                         child: UnifiedRecentChats(query: query),
                       ),
@@ -159,6 +202,7 @@ class _ChatHomePageState extends State<ChatHomePage> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: null,
           onPressed: _showCreateMenu,
           backgroundColor: const Color(0xFF805BB3),
           foregroundColor: Colors.white,
@@ -202,6 +246,12 @@ class _ChatHomePageState extends State<ChatHomePage> {
         ),
       );
 
+  void _clearSearch() {
+    searchController.clear();
+    setState(() => query = '');
+    searchFocusNode.requestFocus();
+  }
+
   void _notice(String text) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
@@ -240,13 +290,6 @@ class _ChatHomePageState extends State<ChatHomePage> {
     );
   }
 
-  String _time(Timestamp? stamp) {
-    if (stamp == null) return '';
-    final value = stamp.toDate();
-    final hour = value.hour.toString().padLeft(2, '0');
-    final minute = value.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -411,20 +454,3 @@ class _ContactAvatar extends StatelessWidget {
       );
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty({required this.icon, required this.title});
-  final IconData icon;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 54, color: AppColors.primary),
-            const SizedBox(height: 14),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-          ],
-        ),
-      );
-}

@@ -164,6 +164,7 @@ class _ContactsPageState extends State<ContactsPage> {
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: null,
           backgroundColor: const Color(0xFF805BB3),
           foregroundColor: Colors.white,
           onPressed: () => Navigator.push(

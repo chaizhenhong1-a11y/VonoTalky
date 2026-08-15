@@ -9,15 +9,20 @@ import '../../../chat/data/services/chat_file_service.dart';
 import '../../../chat/data/models/message_reply.dart';
 import '../../../chat/data/services/chat_media_service.dart';
 import '../../../chat/data/services/chat_voice_service.dart';
+import '../../../chat/data/services/pinned_message_service.dart';
 import '../../../chat/presentation/widgets/file_message_bubble.dart';
 import '../../../chat/presentation/widgets/message_reply_widgets.dart';
 import '../../../chat/presentation/widgets/recording_composer.dart';
 import '../../../chat/presentation/widgets/chat_emoji_picker.dart';
+import '../../../chat/presentation/widgets/pinned_message_banner.dart';
 import '../../../chat/presentation/widgets/voice_message_bubble.dart';
 import '../../../chat/presentation/pages/media_viewer_page.dart';
 import '../../data/models/chat_group.dart';
+import '../../data/services/group_recent_chat_service.dart';
 import '../../data/services/group_service.dart';
 import 'group_details_page.dart';
+import 'group_chat_search_page.dart';
+import 'group_message_info_page.dart';
 
 class GroupChatRoomPage extends StatefulWidget {
   const GroupChatRoomPage({super.key, required this.group});
@@ -30,9 +35,12 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   final controller = TextEditingController();
   final messageScrollController = ScrollController();
   final service = GroupService();
+  final recentChatService = GroupRecentChatService();
+  final pinnedMessageService = PinnedMessageService();
   final mediaService = ChatMediaService();
   final fileService = ChatFileService();
   final voiceService = ChatVoiceService();
+  Timer? draftTimer;
   bool sending = false;
   bool uploading = false;
   bool recording = false;
@@ -41,15 +49,18 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   int voiceSeconds = 0;
   MessageReply? replyingTo;
   bool showEmojiPicker = false;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> latestMessages = const [];
 
   @override
   void initState() {
     super.initState();
     service.markRead(widget.group.id);
+    _restoreDraft();
   }
 
   @override
   void dispose() {
+    draftTimer?.cancel();
     voiceTimer?.cancel();
     voiceService.dispose();
     controller.dispose();
@@ -79,6 +90,11 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
             ),
           ]),
           actions: [
+            IconButton(
+              tooltip: 'Search messages',
+              onPressed: _openGroupSearch,
+              icon: const Icon(Icons.search_rounded),
+            ),
             IconButton(onPressed: () => _notice('Group video call is coming next.'), icon: const Icon(Icons.videocam_outlined)),
             IconButton(
               onPressed: () => Navigator.push(
@@ -94,6 +110,20 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
         body: Container(
           color: const Color(0xFFEDF2F8),
           child: Column(children: [
+            PinnedMessageBanner(
+              title: 'Pinned Messages',
+              preferenceId: 'group_${widget.group.id}',
+              stream: pinnedMessageService.groupPreferences(widget.group.id),
+              onTap: (messageId) => _jumpToMessage(
+                messageId,
+                latestMessages,
+              ),
+              onRemove: (messageId) =>
+                  pinnedMessageService.removeGroup(
+                    widget.group.id,
+                    messageId,
+                  ),
+            ),
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: service.messages(widget.group.id),
@@ -101,6 +131,7 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
                   WidgetsBinding.instance.addPostFrameCallback((_) => service.markRead(widget.group.id));
                   final messages = snapshot.data!.docs;
+                  latestMessages = messages;
                   if (messages.isEmpty) return Center(child: Text('Start chatting in ${widget.group.name}'));
                   return ListView.builder(
                     controller: messageScrollController,
@@ -116,6 +147,9 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                       final readBy = List<String>.from(
                         data['readBy'] as List? ?? const [],
                       );
+                      final reactions = Map<String, dynamic>.from(
+                        data['reactions'] as Map? ?? const {},
+                      );
                       final replyData = data['replyTo'];
                       final reply = replyData is Map
                           ? MessageReply.fromMap(
@@ -125,6 +159,9 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                       return Align(
                         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
                         child: GestureDetector(
+                          onDoubleTap: deleted
+                              ? null
+                              : () => _toggleReaction(document.id, '❤️'),
                           onLongPress: deleted
                               ? null
                               : () => _showActions(document.id, data, mine),
@@ -200,6 +237,17 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(_time(sentAt), style: const TextStyle(fontSize: 10, color: Color(0xFF716A78))),
+                                    if (data['editedAt'] != null) ...[
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'edited',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          color: Color(0xFF8B8293),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
                                     if (mine) ...[
                                       const SizedBox(width: 4),
                                       Icon(
@@ -226,6 +274,44 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                                   ],
                                 ),
                               ),
+                              if (reactions.isNotEmpty) ...[
+                                const SizedBox(height: 5),
+                                Wrap(
+                                  spacing: 5,
+                                  runSpacing: 4,
+                                  children: reactions.entries.map((entry) {
+                                    final users = List<String>.from(
+                                      entry.value as List? ?? const [],
+                                    );
+                                    final reactedByMe =
+                                        users.contains(service.myId);
+                                    return InkWell(
+                                      onTap: () => _toggleReaction(
+                                        document.id,
+                                        entry.key,
+                                      ),
+                                      borderRadius:
+                                          BorderRadius.circular(14),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: reactedByMe
+                                              ? const Color(0xFFE2D4F5)
+                                              : const Color(0xFFF4EFF8),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                        child: Text(
+                                          '${entry.key} ${users.length}',
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
                             ]),
                           ),
                         ),
@@ -263,7 +349,7 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                       icon: const Icon(Icons.sentiment_satisfied_alt_outlined),
                     ),
                     IconButton(onPressed: uploading ? null : _showAttachmentMenu, icon: uploading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.attach_file_rounded)),
-                    Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, decoration: const InputDecoration(hintText: 'Message the group...', border: InputBorder.none, isDense: true), onTap: () { if (showEmojiPicker) setState(() => showEmojiPicker = false); }, onChanged: (_) => setState(() {}), onSubmitted: (_) => _sendText())),
+                    Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, decoration: const InputDecoration(hintText: 'Message the group...', border: InputBorder.none, isDense: true), onTap: () { if (showEmojiPicker) setState(() => showEmojiPicker = false); }, onChanged: (_) { _scheduleDraftSave(); setState(() {}); }, onSubmitted: (_) => _sendText())),
                     IconButton.filled(
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(0xFFB49ADF),
@@ -290,6 +376,38 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
           ]),
         ),
       );
+
+  Future<void> _openGroupSearch() async {
+    final messageId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => GroupChatSearchPage(groupId: widget.group.id),
+      ),
+    );
+
+    if (messageId != null && mounted) {
+      await _jumpToMessage(messageId, latestMessages);
+    }
+  }
+
+  Future<void> _restoreDraft() async {
+    final draft = await recentChatService.loadDraft(widget.group.id);
+    if (!mounted || draft.isEmpty || controller.text.isNotEmpty) return;
+
+    controller.value = TextEditingValue(
+      text: draft,
+      selection: TextSelection.collapsed(offset: draft.length),
+    );
+    setState(() {});
+  }
+
+  void _scheduleDraftSave() {
+    draftTimer?.cancel();
+    final value = controller.text;
+    draftTimer = Timer(const Duration(milliseconds: 350), () {
+      recentChatService.setDraft(widget.group.id, value);
+    });
+  }
 
   void _toggleEmojiPicker() {
     if (!showEmojiPicker) FocusScope.of(context).unfocus();
@@ -320,6 +438,8 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
     });
     try {
       await service.sendText(widget.group, text, reply: reply);
+      draftTimer?.cancel();
+      await recentChatService.setDraft(widget.group.id, '');
     } catch (_) {
       controller.text = text;
       replyingTo = reply;
@@ -402,6 +522,12 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
           ListTile(leading: const Icon(Icons.reply_rounded), title: const Text('Reply'), onTap: () => Navigator.pop(context, 'reply')),
           if ((data['text'] as String? ?? '').isNotEmpty)
             ListTile(leading: const Icon(Icons.copy_rounded), title: const Text('Copy'), onTap: () => Navigator.pop(context, 'copy')),
+          ListTile(leading: const Icon(Icons.emoji_emotions_outlined), title: const Text('React'), onTap: () => Navigator.pop(context, 'react')),
+          ListTile(leading: const Icon(Icons.push_pin_outlined), title: const Text('Pin message'), onTap: () => Navigator.pop(context, 'pin')),
+          if (mine && (data['type'] as String? ?? 'text') == 'text')
+            ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Edit message'), onTap: () => Navigator.pop(context, 'edit')),
+          if (mine)
+            ListTile(leading: const Icon(Icons.info_outline_rounded), title: const Text('Message info'), onTap: () => Navigator.pop(context, 'info')),
           if (mine)
             ListTile(leading: const Icon(Icons.undo_rounded), title: const Text('Recall message'), onTap: () => Navigator.pop(context, 'recall')),
         ]),
@@ -421,8 +547,186 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
     } else if (action == 'copy') {
       await Clipboard.setData(ClipboardData(text: data['text'] as String));
       _notice('Message copied');
+    } else if (action == 'react') {
+      await _showReactionPicker(id);
+    } else if (action == 'pin') {
+      try {
+        await pinnedMessageService.pinGroup(
+          groupId: widget.group.id,
+          messageId: id,
+          data: data,
+          senderName: mine
+              ? 'You'
+              : (data['senderName'] as String? ?? 'Member'),
+        );
+        _notice('Message pinned');
+      } catch (error) {
+        _notice('Pin failed: $error');
+      }
+    } else if (action == 'edit') {
+      await _editGroupMessage(id, data);
+    } else if (action == 'info') {
+      if (mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GroupMessageInfoPage(
+              groupId: widget.group.id,
+              messageId: id,
+              message: data,
+            ),
+          ),
+        );
+      }
     } else if (action == 'recall') {
       await service.recall(widget.group.id, id);
+    }
+  }
+
+  Future<void> _toggleReaction(
+    String messageId,
+    String emoji,
+  ) async {
+    final reference = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(widget.group.id)
+        .collection('messages')
+        .doc(messageId);
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(reference);
+        if (!snapshot.exists) return;
+
+        final data = snapshot.data() ?? const <String, dynamic>{};
+        final reactions = Map<String, dynamic>.from(
+          data['reactions'] as Map? ?? const {},
+        );
+        final users = List<String>.from(
+          reactions[emoji] as List? ?? const [],
+        );
+
+        if (users.contains(service.myId)) {
+          users.remove(service.myId);
+        } else {
+          users.add(service.myId);
+        }
+
+        if (users.isEmpty) {
+          reactions.remove(emoji);
+        } else {
+          reactions[emoji] = users;
+        }
+
+        transaction.update(reference, {'reactions': reactions});
+      });
+    } catch (error) {
+      if (mounted) _notice('Reaction failed: $error');
+    }
+  }
+
+  Future<void> _showReactionPicker(String messageId) async {
+    const emojis = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Wrap(
+            alignment: WrapAlignment.spaceEvenly,
+            spacing: 8,
+            runSpacing: 8,
+            children: emojis.map((emoji) {
+              return InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => Navigator.pop(sheetContext, emoji),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 28),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      await _toggleReaction(messageId, selected);
+    }
+  }
+
+  Future<void> _editGroupMessage(
+    String messageId,
+    Map<String, dynamic> data,
+  ) async {
+    final original = data['text'] as String? ?? '';
+    if (original.trim().isEmpty) return;
+
+    final editController = TextEditingController(text: original);
+
+    final updated = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'Edit message',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        content: TextField(
+          controller: editController,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 6,
+          textInputAction: TextInputAction.newline,
+          decoration: const InputDecoration(
+            hintText: 'Edit your message',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = editController.text.trim();
+              if (value.isEmpty) return;
+              Navigator.pop(dialogContext, value);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    editController.dispose();
+
+    if (updated == null || updated == original.trim()) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.group.id)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'text': updated,
+        'editedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) _notice('Message edited');
+    } catch (error) {
+      if (mounted) _notice('Edit failed: $error');
     }
   }
 

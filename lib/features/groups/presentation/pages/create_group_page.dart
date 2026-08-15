@@ -73,6 +73,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
           ]),
         ),
         floatingActionButton: FloatingActionButton.extended(
+          heroTag: null,
           onPressed: creating ? null : _create,
           backgroundColor: const Color(0xFF805BB3),
           foregroundColor: Colors.white,

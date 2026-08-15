@@ -5,6 +5,66 @@ All notable changes to VonoTalky are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-08-15
+
+### Added
+
+#### Conversation management
+
+- Added direct-chat and group-chat quick actions from Recent Chats.
+- Added pin/unpin, archive/unarchive and mark read/unread controls.
+- Added swipe actions for archive and read-state changes.
+- Added a dedicated Archived Chats manager for direct chats and groups.
+- Added draft previews for direct chats and persistent debounced drafts for groups.
+
+#### Pinned messages
+
+- Added pinned messages for direct chats and group chats.
+- Added a pinned-message banner with jump-to-message navigation.
+- Added support for multiple pinned messages per conversation.
+- Added a dedicated pinned-message management page with individual unpin actions.
+- Preserved compatibility with legacy single-pin data.
+
+#### Search
+
+- Added advanced private-chat message search with keyword highlighting.
+- Added filters for text, photos, files and voice messages.
+- Added file-name matching and jump-to-message navigation from search results.
+- Added group-message search by keyword, sender name and file name.
+- Improved home search so contacts and recent chats respond to the same search query.
+- Added clear-search and matching-state UI on the home page.
+
+#### Group messaging
+
+- Added group message reactions with emoji counts and per-user toggling.
+- Added Message Info for sent group messages, including sent time and seen-by members.
+- Added editing for the sender's own group text messages.
+- Added an `edited` indicator for modified group messages.
+
+### Changed
+
+- Recent Chats now preserves pinned conversations above normal conversations.
+- Draft activity can influence conversation ordering when a saved draft is newer than the last message.
+- Group and direct-chat preferences reuse each user's `contactPreferences` subcollection.
+- Private-chat search now opens the enhanced search experience.
+- Pinned-message management reads directly from the correct preference document.
+
+### Fixed
+
+- Fixed Archived Chats patch compatibility after Recent Chats changes.
+- Fixed Recent Chats action-sheet overflow on shorter screens.
+- Fixed pinned-message synchronization on Flutter Web.
+- Fixed pinned-message manager reads when Firestore already contained pinned data.
+- Fixed stale Flutter widget-test scaffolding that still referenced the removed default `MyApp`.
+- Fixed duplicate default `FloatingActionButton` Hero tags.
+- Removed analyzer warnings caused by stale imports and unused helper declarations.
+
+### Security
+
+- Updated group-message Firestore permissions to support member reactions.
+- Updated sender-only group-message permissions to support `editedAt`.
+- Preserved participant/member access restrictions for conversations and groups.
+
 ## [0.1.0] - 2026-08-14
 
 ### Added

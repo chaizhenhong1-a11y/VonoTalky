@@ -183,12 +183,12 @@ service cloud.firestore {
         allow update: if request.auth != null && (
           (resource.data.senderId == request.auth.uid
            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['text', 'isDeleted']))
+              .hasOnly(['text', 'editedAt', 'isDeleted']))
           ||
           (request.auth.uid in
              get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds
            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['readBy']))
+              .hasOnly(['readBy', 'reactions']))
         );
         allow delete: if false;
       }
