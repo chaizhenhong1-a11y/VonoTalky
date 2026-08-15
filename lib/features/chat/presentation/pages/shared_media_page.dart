@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/services/chat_service.dart';
 import 'media_viewer_page.dart';
@@ -16,18 +17,39 @@ class SharedMediaPage extends StatelessWidget {
           backgroundColor: const Color(0xFFF7F4F9),
           appBar: AppBar(
             title: const Text('Shared Content', style: TextStyle(fontWeight: FontWeight.w800)),
-            bottom: const TabBar(tabs: [Tab(text: 'Photos'), Tab(text: 'Files'), Tab(text: 'Voice')]),
           ),
           body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: service.messages(otherId),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
               final documents = snapshot.data!.docs.where((doc) => doc.data()['isDeleted'] != true).toList();
-              return TabBarView(
+              final photoCount = documents.where((doc) => doc.data()['type'] == 'image').length;
+              final fileCount = documents.where((doc) => doc.data()['type'] == 'file').length;
+              final voiceCount = documents.where((doc) => doc.data()['type'] == 'voice').length;
+              return Column(
                 children: [
-                  _Photos(documents: documents),
-                  _ContentList(documents: documents, type: 'file'),
-                  _ContentList(documents: documents, type: 'voice'),
+                  Material(
+                    color: Colors.white,
+                    child: TabBar(
+                      labelColor: const Color(0xFF7653A5),
+                      unselectedLabelColor: const Color(0xFF7B7380),
+                      indicatorColor: const Color(0xFF8F6DB9),
+                      tabs: [
+                        Tab(text: 'Photos  $photoCount'),
+                        Tab(text: 'Files  $fileCount'),
+                        Tab(text: 'Voice  $voiceCount'),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _Photos(documents: documents),
+                        _ContentList(documents: documents, type: 'file'),
+                        _ContentList(documents: documents, type: 'voice'),
+                      ],
+                    ),
+                  ),
                 ],
               );
             },
@@ -72,6 +94,7 @@ class _ContentList extends StatelessWidget {
       separatorBuilder: (_, __) => const Divider(),
       itemBuilder: (context, index) {
         final data = values[index].data();
+        final fileUrl = data['fileUrl'] as String?;
         final title = type == 'file'
             ? data['fileName'] as String? ?? 'File'
             : 'Voice message · ${((data['durationMs'] as num? ?? 0) / 1000).ceil()}s';
@@ -82,12 +105,42 @@ class _ContentList extends StatelessWidget {
           ),
           title: Text(title),
           subtitle: Text(_date((data['sentAt'] as Timestamp?)?.toDate())),
+          onTap: type == 'file' && fileUrl != null
+              ? () => _openSharedFile(context, fileUrl)
+              : null,
+          trailing: type == 'file'
+              ? IconButton(
+                  onPressed: fileUrl == null
+                      ? null
+                      : () => _openSharedFile(context, fileUrl),
+                  tooltip: 'Open file',
+                  icon: const Icon(
+                    Icons.open_in_new_rounded,
+                    color: Color(0xFF7653A5),
+                  ),
+                )
+              : null,
         );
       },
     );
   }
 
   static String _date(DateTime? value) => value == null ? '' : '${value.day}/${value.month}/${value.year}';
+}
+
+Future<void> _openSharedFile(BuildContext context, String url) async {
+  try {
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (opened || !context.mounted) return;
+  } catch (_) {
+    if (!context.mounted) return;
+  }
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Unable to open this file')),
+  );
 }
 
 class _Empty extends StatelessWidget {

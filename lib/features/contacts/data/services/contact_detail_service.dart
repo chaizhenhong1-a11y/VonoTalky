@@ -43,6 +43,26 @@ class ContactDetailService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+  Future<void> setDraft(String uid, String value) => _db
+      .collection('users')
+      .doc(_myId)
+      .collection('contactPreferences')
+      .doc(uid)
+      .set({
+        'draft': value.trim().isEmpty ? FieldValue.delete() : value,
+        'draftUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+  Future<void> setChatBackground(String uid, String value) => _db
+      .collection('users')
+      .doc(_myId)
+      .collection('contactPreferences')
+      .doc(uid)
+      .set({
+        'chatBackground': value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
   Future<void> removeContact(String uid) => _db
       .collection('users')
       .doc(_myId)

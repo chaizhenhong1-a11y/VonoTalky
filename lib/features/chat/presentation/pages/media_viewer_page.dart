@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/services/media_transfer_service.dart';
 
@@ -18,8 +19,20 @@ class MediaViewerPage extends StatefulWidget {
 
 class _MediaViewerPageState extends State<MediaViewerPage> {
   final transfer = MediaTransferService();
+  final viewerController = TransformationController();
   var retry = 0;
   double? progress;
+
+  @override
+  void dispose() {
+    viewerController.dispose();
+    super.dispose();
+  }
+
+  void _resetZoom() {
+    viewerController.value = Matrix4.identity();
+    _notice('Zoom reset');
+  }
 
   Future<void> _download() async {
     if (progress != null) return;
@@ -48,16 +61,53 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
     }
   }
 
+  Future<void> _copyLink() async {
+    await Clipboard.setData(ClipboardData(text: widget.url));
+    if (mounted) _notice('Image link copied');
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: Colors.black,
         appBar: AppBar(
           foregroundColor: Colors.white,
           backgroundColor: Colors.black,
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            tooltip: 'Close image',
+            icon: const Icon(Icons.close_rounded),
+          ),
           title: Text(widget.name, maxLines: 1, overflow: TextOverflow.ellipsis),
           actions: [
-            IconButton(onPressed: _share, icon: const Icon(Icons.share_outlined)),
-            IconButton(onPressed: _download, icon: const Icon(Icons.download_rounded)),
+            IconButton(
+              onPressed: _resetZoom,
+              tooltip: 'Reset zoom',
+              icon: const Icon(Icons.center_focus_weak_rounded),
+            ),
+            IconButton(
+              onPressed: _copyLink,
+              tooltip: 'Copy image link',
+              icon: const Icon(Icons.link_rounded),
+            ),
+            IconButton(
+              onPressed: _share,
+              tooltip: 'Share image',
+              icon: const Icon(Icons.share_outlined),
+            ),
+            IconButton(
+              onPressed: progress == null ? _download : null,
+              tooltip: progress == null ? 'Download image' : 'Downloading',
+              icon: progress == null
+                  ? const Icon(Icons.download_rounded)
+                  : const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
           ],
           bottom: progress == null
               ? null
@@ -68,6 +118,7 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
         ),
         body: Center(
           child: InteractiveViewer(
+            transformationController: viewerController,
             minScale: .8,
             maxScale: 5,
             boundaryMargin: const EdgeInsets.all(80),

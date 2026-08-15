@@ -235,6 +235,14 @@ class ChatService {
     await batch.commit();
   }
 
+  Future<void> markUnread(String otherId) async {
+    final conversation = _db.collection('conversations').doc(roomId(otherId));
+    await conversation.update({
+      'unreadFor': myId,
+      'unreadCount': 1,
+    });
+  }
+
   Future<void> recall(String otherId, String messageId) => _db
       .collection('conversations')
       .doc(roomId(otherId))
@@ -324,5 +332,24 @@ class ChatService {
       });
     }
     await batch.commit();
+  }
+
+  Future<void> clearForMe(String otherId) async {
+    final snapshot = await _db
+        .collection('conversations')
+        .doc(roomId(otherId))
+        .collection('messages')
+        .get();
+    const batchSize = 400;
+    for (var start = 0; start < snapshot.docs.length; start += batchSize) {
+      final end = (start + batchSize).clamp(0, snapshot.docs.length).toInt();
+      final batch = _db.batch();
+      for (final document in snapshot.docs.sublist(start, end)) {
+        batch.update(document.reference, {
+          'hiddenFor': FieldValue.arrayUnion([myId]),
+        });
+      }
+      await batch.commit();
+    }
   }
 }

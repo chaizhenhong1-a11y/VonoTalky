@@ -13,7 +13,14 @@ class ChatSearchPage extends StatefulWidget {
 
 class _ChatSearchPageState extends State<ChatSearchPage> {
   final service = ChatService();
+  final searchController = TextEditingController();
   String query = '';
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -21,12 +28,23 @@ class _ChatSearchPageState extends State<ChatSearchPage> {
         appBar: AppBar(
           titleSpacing: 0,
           title: TextField(
+            controller: searchController,
             autofocus: true,
             onChanged: (value) => setState(() => query = value.trim().toLowerCase()),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Search messages...',
               border: InputBorder.none,
               filled: false,
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        searchController.clear();
+                        setState(() => query = '');
+                      },
+                      tooltip: 'Clear search',
+                      icon: const Icon(Icons.cancel_rounded, size: 19),
+                    ),
             ),
           ),
         ),
@@ -49,27 +67,55 @@ class _ChatSearchPageState extends State<ChatSearchPage> {
             if (results.isEmpty) {
               return const Center(child: Text('No matching messages'));
             }
-            return ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: results.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final document = results[index];
-                final data = document.data();
-                final value = (data['text'] as String?)?.trim().isNotEmpty == true
-                    ? data['text'] as String
-                    : data['fileName'] as String? ?? _label(data['type'] as String?);
-                final sentAt = (data['sentAt'] as Timestamp?)?.toDate();
-                return ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFF0E8FC),
-                    child: Icon(Icons.search_rounded, color: Color(0xFF7653A5)),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                  child: Text(
+                    '${results.length} ${results.length == 1 ? 'result' : 'results'}',
+                    style: const TextStyle(
+                      color: Color(0xFF796E82),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  title: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(_date(sentAt)),
-                  onTap: () => Navigator.pop(context, document.id),
-                );
-              },
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    itemCount: results.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final document = results[index];
+                      final data = document.data();
+                      final value =
+                          (data['text'] as String?)?.trim().isNotEmpty == true
+                              ? data['text'] as String
+                              : data['fileName'] as String? ??
+                                  _label(data['type'] as String?);
+                      final sentAt =
+                          (data['sentAt'] as Timestamp?)?.toDate();
+                      return ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFF0E8FC),
+                          child: Icon(
+                            Icons.search_rounded,
+                            color: Color(0xFF7653A5),
+                          ),
+                        ),
+                        title: Text(
+                          value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(_date(sentAt)),
+                        onTap: () => Navigator.pop(context, document.id),
+                      );
+                    },
+                  ),
+                ),
+              ],
             );
           },
         ),
