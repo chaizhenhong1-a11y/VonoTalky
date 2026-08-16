@@ -1,7 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatGroup {
-  const ChatGroup({required this.id, required this.name, required this.description, required this.ownerId, required this.adminIds, required this.memberIds, required this.memberCount, this.photoUrl, this.lastMessage = '', this.updatedAt, this.unreadCount = 0});
+  const ChatGroup({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.ownerId,
+    required this.adminIds,
+    required this.memberIds,
+    required this.memberCount,
+    this.photoUrl,
+    this.lastMessage = '',
+    this.updatedAt,
+    this.unreadCount = 0,
+  });
   final String id;
   final String name;
   final String description;
@@ -27,10 +39,12 @@ class ChatGroup {
       photoUrl: data['photoUrl'] as String?,
       lastMessage: data['lastMessage'] as String? ?? '',
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
-      unreadCount: ((data['unreadCounts'] as Map<String, dynamic>? ?? const {})[
-                  GroupServiceIdentity.currentUid] as num? ??
-              0)
-          .toInt(),
+      unreadCount:
+          ((data['unreadCounts'] as Map<String, dynamic>? ??
+                          const {})[GroupServiceIdentity.currentUid]
+                      as num? ??
+                  0)
+              .toInt(),
     );
   }
 }

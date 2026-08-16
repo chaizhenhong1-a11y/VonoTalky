@@ -2,11 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class GroupRecentChatService {
-  GroupRecentChatService({
-    FirebaseFirestore? firestore,
-    FirebaseAuth? auth,
-  })  : _db = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+  GroupRecentChatService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -59,8 +57,6 @@ class GroupRecentChatService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-  Future<void> markUnread(String groupId) => _db
-      .collection('groups')
-      .doc(groupId)
-      .update({'unreadCounts.$_myId': 1});
+  Future<void> markUnread(String groupId) =>
+      _db.collection('groups').doc(groupId).update({'unreadCounts.$_myId': 1});
 }

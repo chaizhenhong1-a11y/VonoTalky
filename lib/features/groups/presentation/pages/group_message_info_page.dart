@@ -47,30 +47,23 @@ class GroupMessageInfoPage extends StatelessWidget {
           _InfoCard(
             icon: Icons.done_all_rounded,
             title: 'Seen by',
-            value: '${readBy.length} ${readBy.length == 1 ? 'member' : 'members'}',
+            value:
+                '${readBy.length} ${readBy.length == 1 ? 'member' : 'members'}',
           ),
           const SizedBox(height: 18),
           const Text(
             'Seen by',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           if (readBy.isEmpty)
             const _EmptySeenState()
           else
-            ...readBy.map(
-              (uid) => _SeenMemberTile(uid: uid),
-            ),
+            ...readBy.map((uid) => _SeenMemberTile(uid: uid)),
           const SizedBox(height: 12),
           Text(
             'Message ID: $messageId',
-            style: const TextStyle(
-              color: Color(0xFF968E9D),
-              fontSize: 10,
-            ),
+            style: const TextStyle(color: Color(0xFF968E9D), fontSize: 10),
           ),
         ],
       ),
@@ -171,10 +164,7 @@ class _MessagePreview extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            _typeIcon(type),
-            color: const Color(0xFF7653A5),
-          ),
+          Icon(_typeIcon(type), color: const Color(0xFF7653A5)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -205,8 +195,7 @@ class _MessagePreview extends StatelessWidget {
       return data['fileName'] as String? ?? 'File';
     }
 
-    final text =
-        (data['text'] as String? ?? '').replaceAll('\n', ' ').trim();
+    final text = (data['text'] as String? ?? '').replaceAll('\n', ' ').trim();
     return text.isEmpty ? 'Message' : text;
   }
 
@@ -231,36 +220,28 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: const Color(0xFF7653A5)),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF6A626F),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: const Color(0xFF7653A5)),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF6A626F),
+              fontWeight: FontWeight.w700,
             ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
+          ),
         ),
-      );
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+      ],
+    ),
+  );
 }
 
 class _EmptySeenState extends StatelessWidget {
@@ -268,25 +249,21 @@ class _EmptySeenState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: const Column(
+      children: [
+        Icon(Icons.visibility_off_outlined, size: 34, color: Color(0xFF9A92A3)),
+        SizedBox(height: 8),
+        Text(
+          'No one else has seen this message yet.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF756E7C)),
         ),
-        child: const Column(
-          children: [
-            Icon(
-              Icons.visibility_off_outlined,
-              size: 34,
-              color: Color(0xFF9A92A3),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'No one else has seen this message yet.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF756E7C)),
-            ),
-          ],
-        ),
-      );
+      ],
+    ),
+  );
 }

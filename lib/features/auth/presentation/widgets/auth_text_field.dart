@@ -47,7 +47,10 @@ class _AuthTextFieldState extends State<AuthTextField> {
         prefixIcon: Icon(widget.icon, color: Colors.white),
         filled: true,
         fillColor: const Color(0x0AFFFFFF),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 15,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
           borderSide: const BorderSide(color: Color(0xCCFFFFFF), width: 1.1),

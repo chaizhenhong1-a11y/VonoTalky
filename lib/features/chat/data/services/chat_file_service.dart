@@ -2,7 +2,12 @@ import 'package:file_selector/file_selector.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class PickedChatFile {
-  const PickedChatFile({required this.file, required this.name, required this.size, required this.extension});
+  const PickedChatFile({
+    required this.file,
+    required this.name,
+    required this.size,
+    required this.extension,
+  });
   final XFile file;
   final String name;
   final int size;
@@ -10,7 +15,13 @@ class PickedChatFile {
 }
 
 class UploadedChatFile {
-  const UploadedChatFile({required this.url, required this.path, required this.name, required this.size, required this.extension});
+  const UploadedChatFile({
+    required this.url,
+    required this.path,
+    required this.name,
+    required this.size,
+    required this.extension,
+  });
   final String url;
   final String path;
   final String name;
@@ -19,7 +30,17 @@ class UploadedChatFile {
 }
 
 class ChatFileService {
-  static const allowed = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip'];
+  static const allowed = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'zip',
+  ];
   static const fileTypes = XTypeGroup(label: 'Documents', extensions: allowed);
 
   Future<PickedChatFile?> pick() async {
@@ -27,9 +48,16 @@ class ChatFileService {
     if (file == null) return null;
     final size = await file.length();
     final extension = _extension(file.name);
-    if (!allowed.contains(extension)) throw Exception('This file type is not supported.');
+    if (!allowed.contains(extension)) {
+      throw Exception('This file type is not supported.');
+    }
     if (size > 25 * 1024 * 1024) throw Exception('File is over 25 MB.');
-    return PickedChatFile(file: file, name: file.name, size: size, extension: extension);
+    return PickedChatFile(
+      file: file,
+      name: file.name,
+      size: size,
+      extension: extension,
+    );
   }
 
   Future<UploadedChatFile> upload({
@@ -40,10 +68,16 @@ class ChatFileService {
   }) async {
     final bytes = await file.file.readAsBytes();
     if (bytes.length > 25 * 1024 * 1024) throw Exception('File is over 25 MB.');
-    final safeName = file.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_').toLowerCase();
-    final path = '$root/$roomId/$userId/${DateTime.now().microsecondsSinceEpoch}_$safeName';
+    final safeName = file.name
+        .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
+        .toLowerCase();
+    final path =
+        '$root/$roomId/$userId/${DateTime.now().microsecondsSinceEpoch}_$safeName';
     final reference = FirebaseStorage.instance.ref(path);
-    await reference.putData(bytes, SettableMetadata(contentType: _contentType(file.extension)));
+    await reference.putData(
+      bytes,
+      SettableMetadata(contentType: _contentType(file.extension)),
+    );
     return UploadedChatFile(
       url: await reference.getDownloadURL(),
       path: path,
@@ -59,12 +93,12 @@ class ChatFileService {
   }
 
   static String _contentType(String extension) => switch (extension) {
-        'pdf' => 'application/pdf',
-        'txt' => 'text/plain',
-        'zip' => 'application/zip',
-        'doc' || 'docx' => 'application/msword',
-        'xls' || 'xlsx' => 'application/vnd.ms-excel',
-        'ppt' || 'pptx' => 'application/vnd.ms-powerpoint',
-        _ => 'application/octet-stream',
-      };
+    'pdf' => 'application/pdf',
+    'txt' => 'text/plain',
+    'zip' => 'application/zip',
+    'doc' || 'docx' => 'application/msword',
+    'xls' || 'xlsx' => 'application/vnd.ms-excel',
+    'ppt' || 'pptx' => 'application/vnd.ms-powerpoint',
+    _ => 'application/octet-stream',
+  };
 }

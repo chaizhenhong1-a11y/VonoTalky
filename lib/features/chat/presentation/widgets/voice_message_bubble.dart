@@ -43,51 +43,51 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble> {
 
   @override
   Widget build(BuildContext context) => StreamBuilder<Duration>(
-        stream: player.positionStream,
-        builder: (_, snapshot) {
-          final position = snapshot.data ?? Duration.zero;
-          final total = player.duration ??
-              Duration(
-                milliseconds: widget.durationMs.clamp(1, 3600000).toInt(),
-              );
-          final progress = total.inMilliseconds == 0
-              ? 0.0
-              : (position.inMilliseconds / total.inMilliseconds)
-                  .clamp(0.0, 1.0)
-                  .toDouble();
-          return SizedBox(
-            width: 220,
-            child: Row(children: [
-              StreamBuilder<bool>(
-                stream: player.playingStream,
-                builder: (_, playing) => IconButton(
-                  onPressed: toggle,
-                  color: widget.mine ? const Color(0xFF65439B) : null,
-                  icon: Icon(
-                    playing.data == true
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                  ),
+    stream: player.positionStream,
+    builder: (_, snapshot) {
+      final position = snapshot.data ?? Duration.zero;
+      final total =
+          player.duration ??
+          Duration(milliseconds: widget.durationMs.clamp(1, 3600000).toInt());
+      final progress = total.inMilliseconds == 0
+          ? 0.0
+          : (position.inMilliseconds / total.inMilliseconds)
+                .clamp(0.0, 1.0)
+                .toDouble();
+      return SizedBox(
+        width: 220,
+        child: Row(
+          children: [
+            StreamBuilder<bool>(
+              stream: player.playingStream,
+              builder: (_, playing) => IconButton(
+                onPressed: toggle,
+                color: widget.mine ? const Color(0xFF65439B) : null,
+                icon: Icon(
+                  playing.data == true
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
                 ),
               ),
-              Expanded(
-                child: LinearProgressIndicator(
-                  value: progress,
-                  color: widget.mine ? const Color(0xFF7150A1) : null,
-                  backgroundColor:
-                      widget.mine ? const Color(0x337150A1) : null,
-                ),
+            ),
+            Expanded(
+              child: LinearProgressIndicator(
+                value: progress,
+                color: widget.mine ? const Color(0xFF7150A1) : null,
+                backgroundColor: widget.mine ? const Color(0x337150A1) : null,
               ),
-              const SizedBox(width: 8),
-              Text(
-                '${total.inSeconds}s',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: widget.mine ? const Color(0xFF716A78) : null,
-                ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${total.inSeconds}s',
+              style: TextStyle(
+                fontSize: 11,
+                color: widget.mine ? const Color(0xFF716A78) : null,
               ),
-            ]),
-          );
-        },
+            ),
+          ],
+        ),
       );
+    },
+  );
 }

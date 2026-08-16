@@ -11,11 +11,8 @@ class ChatMediaService {
   final _picker = ImagePicker();
   final _storage = FirebaseStorage.instance;
 
-  Future<XFile?> pick(ImageSource source) => _picker.pickImage(
-        source: source,
-        imageQuality: 82,
-        maxWidth: 1920,
-      );
+  Future<XFile?> pick(ImageSource source) =>
+      _picker.pickImage(source: source, imageQuality: 82, maxWidth: 1920);
 
   Future<UploadedChatImage> upload({
     required XFile file,

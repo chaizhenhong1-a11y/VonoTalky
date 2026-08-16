@@ -34,18 +34,18 @@ class MessageReply {
   }
 
   factory MessageReply.fromMap(Map<String, dynamic> data) => MessageReply(
-        messageId: data['messageId'] as String? ?? '',
-        senderId: data['senderId'] as String? ?? '',
-        senderName: data['senderName'] as String? ?? 'User',
-        type: data['type'] as String? ?? 'text',
-        preview: data['preview'] as String? ?? 'Message',
-      );
+    messageId: data['messageId'] as String? ?? '',
+    senderId: data['senderId'] as String? ?? '',
+    senderName: data['senderName'] as String? ?? 'User',
+    type: data['type'] as String? ?? 'text',
+    preview: data['preview'] as String? ?? 'Message',
+  );
 
   Map<String, dynamic> toMap() => {
-        'messageId': messageId,
-        'senderId': senderId,
-        'senderName': senderName,
-        'type': type,
-        'preview': preview,
-      };
+    'messageId': messageId,
+    'senderId': senderId,
+    'senderName': senderName,
+    'type': type,
+    'preview': preview,
+  };
 }

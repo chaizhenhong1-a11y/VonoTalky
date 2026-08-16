@@ -16,7 +16,9 @@ class ChatVoiceService {
   Future<bool> start() async {
     if (!await recorder.hasPermission()) return false;
     final name = 'voice_${DateTime.now().microsecondsSinceEpoch}.wav';
-    final path = kIsWeb ? name : '${(await getTemporaryDirectory()).path}/$name';
+    final path = kIsWeb
+        ? name
+        : '${(await getTemporaryDirectory()).path}/$name';
     await recorder.start(
       const RecordConfig(encoder: AudioEncoder.wav, sampleRate: 16000),
       path: path,

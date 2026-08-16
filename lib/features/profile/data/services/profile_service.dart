@@ -38,7 +38,8 @@ class ProfileService {
     await ref.putData(bytes, SettableMetadata(contentType: contentType));
     final downloadUrl = await ref.getDownloadURL();
     final separator = downloadUrl.contains('?') ? '&' : '?';
-    final url = '$downloadUrl${separator}v=${DateTime.now().millisecondsSinceEpoch}';
+    final url =
+        '$downloadUrl${separator}v=${DateTime.now().millisecondsSinceEpoch}';
     await _auth.currentUser!.updatePhotoURL(url);
     await _db.collection('users').doc(uid).update({
       'photoUrl': url,
@@ -59,12 +60,12 @@ class ProfileService {
   }
 
   String _extension(String contentType) => switch (contentType) {
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-        'image/gif' => 'gif',
-        'image/heic' || 'image/heif' => 'heic',
-        _ => 'jpg',
-      };
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+    'image/gif' => 'gif',
+    'image/heic' || 'image/heif' => 'heic',
+    _ => 'jpg',
+  };
 
   Future<void> update({
     required String displayName,

@@ -41,19 +41,31 @@ class NotificationService {
       badge: true,
       sound: true,
     );
-    foregroundSubscription = FirebaseMessaging.onMessage.listen(_showInAppBanner);
-    openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(_openMessage);
+    foregroundSubscription = FirebaseMessaging.onMessage.listen(
+      _showInAppBanner,
+    );
+    openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+      _openMessage,
+    );
     tokenSubscription = messaging.onTokenRefresh.listen(_saveToken);
     authSubscription = auth.authStateChanges().listen(_bindUser);
     final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {
-      Future<void>.delayed(const Duration(milliseconds: 1200), () => _openMessage(initialMessage));
+      Future<void>.delayed(
+        const Duration(milliseconds: 1200),
+        () => _openMessage(initialMessage),
+      );
     }
   }
 
   Future<void> _bindUser(User? user) async {
-    if (boundUserId != null && currentToken != null && boundUserId != user?.uid) {
-      await _deviceReference(boundUserId!, currentToken!).delete().catchError((_) {});
+    if (boundUserId != null &&
+        currentToken != null &&
+        boundUserId != user?.uid) {
+      await _deviceReference(
+        boundUserId!,
+        currentToken!,
+      ).delete().catchError((_) {});
     }
     boundUserId = user?.uid;
     if (user == null) return;
@@ -79,13 +91,18 @@ class NotificationService {
     String token,
   ) {
     final deviceId = token.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-    return database.collection('users').doc(userId).collection('devices').doc(deviceId);
+    return database
+        .collection('users')
+        .doc(userId)
+        .collection('devices')
+        .doc(deviceId);
   }
 
   void _showInAppBanner(RemoteMessage message) {
     final context = AppNavigator.key.currentContext;
     if (context == null) return;
-    final title = message.notification?.title ?? message.data['title'] ?? 'New message';
+    final title =
+        message.notification?.title ?? message.data['title'] ?? 'New message';
     final body = message.notification?.body ?? message.data['body'] ?? '';
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentMaterialBanner();
@@ -99,7 +116,8 @@ class NotificationService {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            if (body.isNotEmpty) Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
+            if (body.isNotEmpty)
+              Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
         ),
         actions: [
@@ -129,7 +147,9 @@ class NotificationService {
       if (senderId == null) return;
       final user = await ChatService().user(senderId);
       if (user != null) {
-        navigator.push(MaterialPageRoute(builder: (_) => RealChatRoomPage(user: user)));
+        navigator.push(
+          MaterialPageRoute(builder: (_) => RealChatRoomPage(user: user)),
+        );
       }
     }
     if (type == 'group') {
@@ -137,7 +157,9 @@ class NotificationService {
       if (groupId == null) return;
       final group = await GroupService().group(groupId).first;
       if (group != null) {
-        navigator.push(MaterialPageRoute(builder: (_) => GroupChatRoomPage(group: group)));
+        navigator.push(
+          MaterialPageRoute(builder: (_) => GroupChatRoomPage(group: group)),
+        );
       }
     }
   }

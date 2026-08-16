@@ -27,11 +27,14 @@ class ContactService {
         final documents = await Future.wait(
           contactIds.map((id) => _db.collection('users').doc(id).get()),
         );
-        final users = documents
-            .where((document) => document.exists)
-            .map(ChatUser.fromDoc)
-            .toList()
-          ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        final users =
+            documents
+                .where((document) => document.exists)
+                .map(ChatUser.fromDoc)
+                .toList()
+              ..sort(
+                (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+              );
         if (!controller.isClosed) controller.add(users);
       } catch (error, stackTrace) {
         if (!controller.isClosed) controller.addError(error, stackTrace);
@@ -48,9 +51,11 @@ class ContactService {
             .collection('contacts')
             .snapshots()
             .listen((snapshot) {
-          contactIds = snapshot.docs.map((document) => document.id).toList();
-          refresh();
-        }, onError: controller.addError);
+              contactIds = snapshot.docs
+                  .map((document) => document.id)
+                  .toList();
+              refresh();
+            }, onError: controller.addError);
         refreshTimer = Timer.periodic(
           const Duration(seconds: 30),
           (_) => refresh(),
@@ -71,11 +76,16 @@ class ContactService {
       .map((snapshot) {
         final requests = snapshot.docs
             .map(FriendRequest.fromDoc)
-            .where((request) =>
-                request.receiverId == myId && request.status == 'pending')
+            .where(
+              (request) =>
+                  request.receiverId == myId && request.status == 'pending',
+            )
             .toList();
-        requests.sort((a, b) => (b.createdAt ?? DateTime(1970))
-            .compareTo(a.createdAt ?? DateTime(1970)));
+        requests.sort(
+          (a, b) => (b.createdAt ?? DateTime(1970)).compareTo(
+            a.createdAt ?? DateTime(1970),
+          ),
+        );
         return requests;
       });
 
@@ -103,7 +113,9 @@ class ContactService {
         .limit(10)
         .get();
     for (final document in username.docs) {
-      if (document.id != myId) results[document.id] = ChatUser.fromDoc(document);
+      if (document.id != myId) {
+        results[document.id] = ChatUser.fromDoc(document);
+      }
     }
 
     final email = await _db
@@ -112,7 +124,9 @@ class ContactService {
         .limit(10)
         .get();
     for (final document in email.docs) {
-      if (document.id != myId) results[document.id] = ChatUser.fromDoc(document);
+      if (document.id != myId) {
+        results[document.id] = ChatUser.fromDoc(document);
+      }
     }
 
     final names = await _db
@@ -123,7 +137,9 @@ class ContactService {
         .limit(20)
         .get();
     for (final document in names.docs) {
-      if (document.id != myId) results[document.id] = ChatUser.fromDoc(document);
+      if (document.id != myId) {
+        results[document.id] = ChatUser.fromDoc(document);
+      }
     }
     return results.values.toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
@@ -157,8 +173,12 @@ class ContactService {
     }
     if (existing != null) {
       final status = existing.data()['status'];
-      if (status == 'pending') throw StateError('A request is already pending.');
-      if (status == 'accepted') throw StateError('This user is already a contact.');
+      if (status == 'pending') {
+        throw StateError('A request is already pending.');
+      }
+      if (status == 'accepted') {
+        throw StateError('This user is already a contact.');
+      }
       throw StateError('This request was previously declined.');
     }
     await reference.set({
@@ -180,7 +200,11 @@ class ContactService {
       'respondedAt': FieldValue.serverTimestamp(),
     });
     batch.set(
-      _db.collection('users').doc(myId).collection('contacts').doc(request.senderId),
+      _db
+          .collection('users')
+          .doc(myId)
+          .collection('contacts')
+          .doc(request.senderId),
       {
         'uid': request.senderId,
         'requestId': request.id,
@@ -188,7 +212,11 @@ class ContactService {
       },
     );
     batch.set(
-      _db.collection('users').doc(request.senderId).collection('contacts').doc(myId),
+      _db
+          .collection('users')
+          .doc(request.senderId)
+          .collection('contacts')
+          .doc(myId),
       {
         'uid': myId,
         'requestId': request.id,
@@ -198,8 +226,9 @@ class ContactService {
     await batch.commit();
   }
 
-  Future<void> reject(FriendRequest request) => _db
-      .collection('friendRequests')
-      .doc(request.id)
-      .update({'status': 'rejected', 'respondedAt': FieldValue.serverTimestamp()});
+  Future<void> reject(FriendRequest request) =>
+      _db.collection('friendRequests').doc(request.id).update({
+        'status': 'rejected',
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
 }

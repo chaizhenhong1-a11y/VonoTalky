@@ -19,13 +19,12 @@ class MessageManagementService {
     required String messageId,
     required String contactName,
     required Map<String, dynamic> message,
-  }) =>
-      _db
-          .collection('users')
-          .doc(_uid)
-          .collection('savedMessages')
-          .doc('${conversationId}_$messageId')
-          .set({
+  }) => _db
+      .collection('users')
+      .doc(_uid)
+      .collection('savedMessages')
+      .doc('${conversationId}_$messageId')
+      .set({
         'conversationId': conversationId,
         'messageId': messageId,
         'contactName': contactName,

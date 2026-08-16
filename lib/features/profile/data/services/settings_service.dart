@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class SettingsService {
   SettingsService({FirebaseAuth? auth, FirebaseFirestore? firestore})
-      : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+    : _auth = auth ?? FirebaseAuth.instance,
+      _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -16,14 +16,15 @@ class SettingsService {
       .collection('users')
       .doc(_uid)
       .snapshots()
-      .map((snapshot) => snapshot.data()?['settings'] as Map<String, dynamic>? ?? {});
+      .map(
+        (snapshot) =>
+            snapshot.data()?['settings'] as Map<String, dynamic>? ?? {},
+      );
 
   Future<void> setBool(String key, bool value) => setValue(key, value);
 
-  Future<void> setValue(String key, Object value) => _firestore
-      .collection('users')
-      .doc(_uid)
-      .update({
+  Future<void> setValue(String key, Object value) =>
+      _firestore.collection('users').doc(_uid).update({
         'settings.$key': value,
         'updatedAt': FieldValue.serverTimestamp(),
       });

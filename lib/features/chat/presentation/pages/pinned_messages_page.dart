@@ -16,9 +16,7 @@ class PinnedMessagesPage extends StatelessWidget {
   final ValueChanged<String> onOpen;
   final Future<void> Function(String messageId) onRemove;
 
-  static List<Map<String, dynamic>> readPinned(
-    Map<String, dynamic>? data,
-  ) =>
+  static List<Map<String, dynamic>> readPinned(Map<String, dynamic>? data) =>
       PinnedMessageService.parsePinned(data);
 
   @override
@@ -30,10 +28,7 @@ class PinnedMessagesPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF9F7FC),
         surfaceTintColor: Colors.transparent,
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: StreamBuilder<Map<String, dynamic>>(
         stream: service.preferencesById(preferenceId),
@@ -64,12 +59,11 @@ class PinnedMessagesPage extends StatelessWidget {
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
             itemCount: pinned.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final item = pinned[index];
               final id = item['messageId']?.toString() ?? '';
-              final preview =
-                  item['preview']?.toString() ?? 'Pinned message';
+              final preview = item['preview']?.toString() ?? 'Pinned message';
               final sender = item['sender']?.toString() ?? '';
               final type = item['type']?.toString() ?? 'text';
 
@@ -156,35 +150,26 @@ class _PinnedState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 52,
-                color: const Color(0xFF805BB3),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF756E7C),
-                ),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 52, color: const Color(0xFF805BB3)),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
-        ),
-      );
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFF756E7C)),
+          ),
+        ],
+      ),
+    ),
+  );
 }

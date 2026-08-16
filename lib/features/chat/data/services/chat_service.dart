@@ -11,7 +11,10 @@ class ChatService {
   String get myId => _auth.currentUser!.uid;
   String roomId(String otherId) => ([myId, otherId]..sort()).join('_');
 
-  Stream<List<ChatUser>> users() => _db.collection('users').snapshots().map(
+  Stream<List<ChatUser>> users() => _db
+      .collection('users')
+      .snapshots()
+      .map(
         (event) => event.docs
             .where((doc) => doc.id != myId)
             .map(ChatUser.fromDoc)
@@ -24,15 +27,16 @@ class ChatService {
         .where('memberIds', arrayContains: myId)
         .snapshots()
         .map((event) {
-      final docs = event.docs.toList();
-      docs.sort((a, b) {
-        final x = a.data()['updatedAt'] as Timestamp?;
-        final y = b.data()['updatedAt'] as Timestamp?;
-        return (y?.millisecondsSinceEpoch ?? 0)
-            .compareTo(x?.millisecondsSinceEpoch ?? 0);
-      });
-      return docs;
-    });
+          final docs = event.docs.toList();
+          docs.sort((a, b) {
+            final x = a.data()['updatedAt'] as Timestamp?;
+            final y = b.data()['updatedAt'] as Timestamp?;
+            return (y?.millisecondsSinceEpoch ?? 0).compareTo(
+              x?.millisecondsSinceEpoch ?? 0,
+            );
+          });
+          return docs;
+        });
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> messages(String otherId) => _db
@@ -56,11 +60,7 @@ class ChatService {
     return doc.exists ? ChatUser.fromDoc(doc) : null;
   }
 
-  Future<void> send(
-    String otherId,
-    String text, {
-    MessageReply? reply,
-  }) async {
+  Future<void> send(String otherId, String text, {MessageReply? reply}) async {
     final value = text.trim();
     if (value.isEmpty) return;
     final members = [myId, otherId]..sort();
@@ -237,10 +237,7 @@ class ChatService {
 
   Future<void> markUnread(String otherId) async {
     final conversation = _db.collection('conversations').doc(roomId(otherId));
-    await conversation.update({
-      'unreadFor': myId,
-      'unreadCount': 1,
-    });
+    await conversation.update({'unreadFor': myId, 'unreadCount': 1});
   }
 
   Future<void> recall(String otherId, String messageId) => _db
@@ -280,20 +277,12 @@ class ChatService {
     return send(otherId, source['text'] as String? ?? '');
   }
 
-  Future<void> editMessage(
-    String otherId,
-    String messageId,
-    String text,
-  ) =>
-      _db
-          .collection('conversations')
-          .doc(roomId(otherId))
-          .collection('messages')
-          .doc(messageId)
-          .update({
-        'text': text.trim(),
-        'editedAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> editMessage(String otherId, String messageId, String text) => _db
+      .collection('conversations')
+      .doc(roomId(otherId))
+      .collection('messages')
+      .doc(messageId)
+      .update({'text': text.trim(), 'editedAt': FieldValue.serverTimestamp()});
 
   Future<void> toggleReaction(
     String otherId,
@@ -308,7 +297,9 @@ class ChatService {
     await _db.runTransaction((transaction) async {
       final snapshot = await transaction.get(reference);
       final data = snapshot.data() ?? <String, dynamic>{};
-      final reactions = Map<String, dynamic>.from(data['reactions'] as Map? ?? {});
+      final reactions = Map<String, dynamic>.from(
+        data['reactions'] as Map? ?? {},
+      );
       final users = List<String>.from(reactions[emoji] as List? ?? const []);
       users.contains(myId) ? users.remove(myId) : users.add(myId);
       if (users.isEmpty) {

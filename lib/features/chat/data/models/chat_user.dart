@@ -23,9 +23,10 @@ class ChatUser {
   factory ChatUser.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
     final name = (data['displayName'] as String? ?? '').trim();
-    final presenceUpdatedAt =
-        (data['presenceUpdatedAt'] as Timestamp?)?.toDate();
-    final heartbeatIsFresh = presenceUpdatedAt != null &&
+    final presenceUpdatedAt = (data['presenceUpdatedAt'] as Timestamp?)
+        ?.toDate();
+    final heartbeatIsFresh =
+        presenceUpdatedAt != null &&
         DateTime.now().difference(presenceUpdatedAt).inSeconds < 90;
     return ChatUser(
       uid: doc.id,

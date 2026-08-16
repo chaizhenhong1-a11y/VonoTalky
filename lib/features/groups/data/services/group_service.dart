@@ -16,9 +16,17 @@ class GroupService {
     return uid;
   }
 
-  Stream<List<ChatGroup>> groups() => _db.collection('groups').where('memberIds', arrayContains: myId).snapshots().map((snapshot) {
+  Stream<List<ChatGroup>> groups() => _db
+      .collection('groups')
+      .where('memberIds', arrayContains: myId)
+      .snapshots()
+      .map((snapshot) {
         final groups = snapshot.docs.map(ChatGroup.fromDoc).toList();
-        groups.sort((a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(a.updatedAt ?? DateTime(1970)));
+        groups.sort(
+          (a, b) => (b.updatedAt ?? DateTime(1970)).compareTo(
+            a.updatedAt ?? DateTime(1970),
+          ),
+        );
         return groups;
       });
 
@@ -52,7 +60,9 @@ class GroupService {
     if (file == null) return null;
     final bytes = await file.readAsBytes();
     if (bytes.length > 8 * 1024 * 1024) throw Exception('Image is over 8 MB.');
-    final reference = FirebaseStorage.instance.ref('group_avatars/$groupId/avatar.jpg');
+    final reference = FirebaseStorage.instance.ref(
+      'group_avatars/$groupId/avatar.jpg',
+    );
     await reference.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
     final url = await reference.getDownloadURL();
     await _db.collection('groups').doc(groupId).update({
@@ -69,9 +79,18 @@ class GroupService {
       final reference = _db.collection('groups').doc(groupId);
       final snapshot = await transaction.get(reference);
       final data = snapshot.data()!;
-      final members = <String>{...List<String>.from(data['memberIds'] as List), ...ids}.toList()..sort();
-      final update = <String, dynamic>{'memberIds': members, 'memberCount': members.length, 'updatedAt': FieldValue.serverTimestamp()};
-      for (final uid in ids) update['unreadCounts.$uid'] = 0;
+      final members = <String>{
+        ...List<String>.from(data['memberIds'] as List),
+        ...ids,
+      }.toList()..sort();
+      final update = <String, dynamic>{
+        'memberIds': members,
+        'memberCount': members.length,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      for (final uid in ids) {
+        update['unreadCounts.$uid'] = 0;
+      }
       transaction.update(reference, update);
     });
   }
@@ -88,7 +107,9 @@ class GroupService {
 
   Future<void> setAdmin(String groupId, String userId, bool enabled) =>
       _db.collection('groups').doc(groupId).update({
-        'adminIds': enabled ? FieldValue.arrayUnion([userId]) : FieldValue.arrayRemove([userId]),
+        'adminIds': enabled
+            ? FieldValue.arrayUnion([userId])
+            : FieldValue.arrayRemove([userId]),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -100,13 +121,22 @@ class GroupService {
       });
 
   Future<void> leaveGroup(String groupId) => removeMember(groupId, myId);
-  Future<void> deleteGroup(String groupId) => _db.collection('groups').doc(groupId).delete();
+  Future<void> deleteGroup(String groupId) =>
+      _db.collection('groups').doc(groupId).delete();
 
-  Future<String> createGroup({required String name, required String description, required Iterable<String> selectedMemberIds}) async {
+  Future<String> createGroup({
+    required String name,
+    required String description,
+    required Iterable<String> selectedMemberIds,
+  }) async {
     final cleanName = name.trim();
-    if (cleanName.length < 2) throw ArgumentError('Group name must contain at least 2 characters.');
+    if (cleanName.length < 2) {
+      throw ArgumentError('Group name must contain at least 2 characters.');
+    }
     final members = <String>{myId, ...selectedMemberIds}.toList()..sort();
-    if (members.length < 2) throw ArgumentError('Select at least one group member.');
+    if (members.length < 2) {
+      throw ArgumentError('Select at least one group member.');
+    }
     final group = _db.collection('groups').doc();
     await group.set({
       'name': cleanName,
@@ -133,7 +163,8 @@ class GroupService {
       .limit(100)
       .snapshots();
 
-  Future<void> sendText(ChatGroup group, String text, {MessageReply? reply}) => _send(
+  Future<void> sendText(ChatGroup group, String text, {MessageReply? reply}) =>
+      _send(
         group: group,
         type: 'text',
         preview: text.trim(),
@@ -141,34 +172,66 @@ class GroupService {
         reply: reply,
       );
 
-  Future<void> sendImage(ChatGroup group, String url, String path, {MessageReply? reply}) => _send(
-        group: group,
-        type: 'image',
-        preview: '📷 Photo',
-        payload: {'imageUrl': url, 'storagePath': path},
-        reply: reply,
-      );
+  Future<void> sendImage(
+    ChatGroup group,
+    String url,
+    String path, {
+    MessageReply? reply,
+  }) => _send(
+    group: group,
+    type: 'image',
+    preview: '📷 Photo',
+    payload: {'imageUrl': url, 'storagePath': path},
+    reply: reply,
+  );
 
-  Future<void> sendFile(ChatGroup group, {required String url, required String path, required String name, required String extension, required int size, MessageReply? reply}) => _send(
-        group: group,
-        type: 'file',
-        preview: '📎 $name',
-        payload: {'fileUrl': url, 'storagePath': path, 'fileName': name, 'fileExtension': extension, 'fileSize': size},
-        reply: reply,
-      );
+  Future<void> sendFile(
+    ChatGroup group, {
+    required String url,
+    required String path,
+    required String name,
+    required String extension,
+    required int size,
+    MessageReply? reply,
+  }) => _send(
+    group: group,
+    type: 'file',
+    preview: '📎 $name',
+    payload: {
+      'fileUrl': url,
+      'storagePath': path,
+      'fileName': name,
+      'fileExtension': extension,
+      'fileSize': size,
+    },
+    reply: reply,
+  );
 
-  Future<void> sendVoice(ChatGroup group, {required String url, required String path, required int durationMs, MessageReply? reply}) => _send(
-        group: group,
-        type: 'voice',
-        preview: '🎤 Voice message',
-        payload: {'audioUrl': url, 'storagePath': path, 'durationMs': durationMs},
-        reply: reply,
-      );
+  Future<void> sendVoice(
+    ChatGroup group, {
+    required String url,
+    required String path,
+    required int durationMs,
+    MessageReply? reply,
+  }) => _send(
+    group: group,
+    type: 'voice',
+    preview: '🎤 Voice message',
+    payload: {'audioUrl': url, 'storagePath': path, 'durationMs': durationMs},
+    reply: reply,
+  );
 
-  Future<void> _send({required ChatGroup group, required String type, required String preview, required Map<String, dynamic> payload, MessageReply? reply}) async {
+  Future<void> _send({
+    required ChatGroup group,
+    required String type,
+    required String preview,
+    required Map<String, dynamic> payload,
+    MessageReply? reply,
+  }) async {
     if (preview.isEmpty) return;
     final user = await _db.collection('users').doc(myId).get();
-    final senderName = user.data()?['displayName'] as String? ?? 'VonoTalky user';
+    final senderName =
+        user.data()?['displayName'] as String? ?? 'VonoTalky user';
     final senderPhotoUrl = user.data()?['photoUrl'] as String?;
     final reference = _db.collection('groups').doc(group.id);
     final message = reference.collection('messages').doc();
@@ -199,11 +262,21 @@ class GroupService {
   Future<void> markRead(String groupId) async {
     final group = _db.collection('groups').doc(groupId);
     await group.update({'unreadCounts.$myId': 0});
-    final snapshot = await group.collection('messages').orderBy('sentAt', descending: true).limit(100).get();
+    final snapshot = await group
+        .collection('messages')
+        .orderBy('sentAt', descending: true)
+        .limit(100)
+        .get();
     final batch = _db.batch();
     for (final message in snapshot.docs) {
-      final readBy = List<String>.from(message.data()['readBy'] as List? ?? const []);
-      if (!readBy.contains(myId)) batch.update(message.reference, {'readBy': FieldValue.arrayUnion([myId])});
+      final readBy = List<String>.from(
+        message.data()['readBy'] as List? ?? const [],
+      );
+      if (!readBy.contains(myId)) {
+        batch.update(message.reference, {
+          'readBy': FieldValue.arrayUnion([myId]),
+        });
+      }
     }
     await batch.commit();
   }

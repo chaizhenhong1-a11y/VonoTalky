@@ -13,9 +13,6 @@ abstract final class AppRouter {
       _ => const LoginPage(),
     };
 
-    return MaterialPageRoute(
-      settings: settings,
-      builder: (_) => page,
-    );
+    return MaterialPageRoute(settings: settings, builder: (_) => page);
   }
 }

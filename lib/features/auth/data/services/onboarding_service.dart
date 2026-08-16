@@ -16,9 +16,13 @@ class OnboardingService {
   }) async {
     final cleanName = displayName.trim();
     final cleanUsername = username.trim().toLowerCase();
-    if (cleanName.length < 2) throw const OnboardingFailure('Enter your display name.');
+    if (cleanName.length < 2) {
+      throw const OnboardingFailure('Enter your display name.');
+    }
     if (!RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(cleanUsername)) {
-      throw const OnboardingFailure('Username must be 3–20 letters, numbers or underscores.');
+      throw const OnboardingFailure(
+        'Username must be 3–20 letters, numbers or underscores.',
+      );
     }
 
     final usernameRef = _db.collection('usernames').doc(cleanUsername);

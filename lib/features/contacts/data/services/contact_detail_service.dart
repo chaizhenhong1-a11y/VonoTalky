@@ -9,10 +9,11 @@ class ContactDetailService {
 
   String get _myId => _auth.currentUser!.uid;
 
-  Stream<ChatUser?> user(String uid) =>
-      _db.collection('users').doc(uid).snapshots().map(
-            (document) => document.exists ? ChatUser.fromDoc(document) : null,
-          );
+  Stream<ChatUser?> user(String uid) => _db
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      .map((document) => document.exists ? ChatUser.fromDoc(document) : null);
 
   Stream<Map<String, dynamic>> preferences(String uid) => _db
       .collection('users')

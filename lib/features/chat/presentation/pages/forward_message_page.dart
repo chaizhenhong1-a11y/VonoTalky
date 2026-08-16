@@ -23,71 +23,116 @@ class _ForwardMessagePageState extends State<ForwardMessagePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: const Color(0xFFF7F4F9),
-        appBar: AppBar(title: const Text('Forward To', style: TextStyle(fontWeight: FontWeight.w800))),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: TextField(
-                onChanged: (value) => setState(() => query = value.toLowerCase()),
-                decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Search contacts'),
-              ),
+    backgroundColor: const Color(0xFFF7F4F9),
+    appBar: AppBar(
+      title: const Text(
+        'Forward To',
+        style: TextStyle(fontWeight: FontWeight.w800),
+      ),
+    ),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(14),
+          child: TextField(
+            onChanged: (value) => setState(() => query = value.toLowerCase()),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search_rounded),
+              hintText: 'Search contacts',
             ),
-            Expanded(
-              child: StreamBuilder<List<ChatUser>>(
-                stream: contacts.contacts(),
-                builder: (context, contactSnapshot) =>
-                    StreamBuilder<List<ChatGroup>>(
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<List<ChatUser>>(
+            stream: contacts.contacts(),
+            builder: (context, contactSnapshot) =>
+                StreamBuilder<List<ChatGroup>>(
                   stream: groups.groups(),
                   builder: (context, groupSnapshot) {
-                  if (!contactSnapshot.hasData || !groupSnapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final users = contactSnapshot.data!
-                      .where((user) => user.name.toLowerCase().contains(query))
-                      .toList();
-                  final groupItems = groupSnapshot.data!
-                      .where((group) => group.name.toLowerCase().contains(query))
-                      .toList();
-                  return ListView(
-                    children: [
-                      if (users.isNotEmpty) const _SectionLabel('Contacts'),
-                      ...users.map((user) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFE9DDF8),
-                          backgroundImage: user.photoUrl == null ? null : NetworkImage(user.photoUrl!),
-                          child: user.photoUrl == null ? Text(user.name[0].toUpperCase()) : null,
+                    if (!contactSnapshot.hasData || !groupSnapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final users = contactSnapshot.data!
+                        .where(
+                          (user) => user.name.toLowerCase().contains(query),
+                        )
+                        .toList();
+                    final groupItems = groupSnapshot.data!
+                        .where(
+                          (group) => group.name.toLowerCase().contains(query),
+                        )
+                        .toList();
+                    return ListView(
+                      children: [
+                        if (users.isNotEmpty) const _SectionLabel('Contacts'),
+                        ...users.map(
+                          (user) => ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFFE9DDF8),
+                              backgroundImage: user.photoUrl == null
+                                  ? null
+                                  : NetworkImage(user.photoUrl!),
+                              child: user.photoUrl == null
+                                  ? Text(user.name[0].toUpperCase())
+                                  : null,
+                            ),
+                            title: Text(user.name),
+                            trailing: sendingTo == user.uid
+                                ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send_rounded,
+                                    color: Color(0xFF9C7AC8),
+                                  ),
+                            onTap: sendingTo == null
+                                ? () => _forwardUser(user)
+                                : null,
+                          ),
                         ),
-                        title: Text(user.name),
-                        trailing: sendingTo == user.uid
-                            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.send_rounded, color: Color(0xFF9C7AC8)),
-                        onTap: sendingTo == null ? () => _forwardUser(user) : null,
-                      )),
-                      if (groupItems.isNotEmpty) const _SectionLabel('Groups'),
-                      ...groupItems.map((group) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFE9DDF8),
-                          backgroundImage: group.photoUrl == null ? null : NetworkImage(group.photoUrl!),
-                          child: group.photoUrl == null ? const Icon(Icons.groups_rounded) : null,
+                        if (groupItems.isNotEmpty)
+                          const _SectionLabel('Groups'),
+                        ...groupItems.map(
+                          (group) => ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFFE9DDF8),
+                              backgroundImage: group.photoUrl == null
+                                  ? null
+                                  : NetworkImage(group.photoUrl!),
+                              child: group.photoUrl == null
+                                  ? const Icon(Icons.groups_rounded)
+                                  : null,
+                            ),
+                            title: Text(group.name),
+                            subtitle: Text('${group.memberCount} members'),
+                            trailing: sendingTo == 'group:${group.id}'
+                                ? const SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send_rounded,
+                                    color: Color(0xFF9C7AC8),
+                                  ),
+                            onTap: sendingTo == null
+                                ? () => _forwardGroup(group)
+                                : null,
+                          ),
                         ),
-                        title: Text(group.name),
-                        subtitle: Text('${group.memberCount} members'),
-                        trailing: sendingTo == 'group:${group.id}'
-                            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.send_rounded, color: Color(0xFF9C7AC8)),
-                        onTap: sendingTo == null ? () => _forwardGroup(group) : null,
-                      )),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
                 ),
-              ),
-            ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Future<void> _forwardUser(ChatUser user) async {
     setState(() => sendingTo = user.uid);
@@ -100,7 +145,9 @@ class _ForwardMessagePageState extends State<ForwardMessagePage> {
     } catch (_) {
       if (mounted) {
         setState(() => sendingTo = null);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Forward failed')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Forward failed')));
       }
     }
   }
@@ -116,7 +163,9 @@ class _ForwardMessagePageState extends State<ForwardMessagePage> {
     } catch (_) {
       if (mounted) {
         setState(() => sendingTo = null);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Forward failed')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Forward failed')));
       }
     }
   }
@@ -127,10 +176,13 @@ class _SectionLabel extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
-        child: Text(
-          text,
-          style: const TextStyle(color: Color(0xFF7653A5), fontWeight: FontWeight.w800),
-        ),
-      );
+    padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+    child: Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF7653A5),
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
 }

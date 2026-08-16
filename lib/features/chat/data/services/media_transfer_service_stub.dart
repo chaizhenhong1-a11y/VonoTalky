@@ -15,7 +15,7 @@ class MediaTransferService {
 
   Future<void> share({required String url, required String name}) async {
     await SharePlus.instance.share(
-        ShareParams(text: '$name\n$url', title: name),
-      );
+      ShareParams(text: '$name\n$url', title: name),
+    );
   }
 }

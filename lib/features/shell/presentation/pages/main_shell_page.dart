@@ -52,47 +52,47 @@ class _MainShellPageState extends State<MainShellPage>
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: IndexedStack(index: selectedIndex, children: pages),
-        bottomNavigationBar: StreamBuilder<int>(
-          stream: unreadStream,
-          initialData: 0,
-          builder: (context, snapshot) => NavigationBar(
-            height: 66,
-            selectedIndex: selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() => selectedIndex = index);
-            },
-            destinations: [
-              NavigationDestination(
-                icon: _UnreadIcon(
-                  icon: Icons.home_outlined,
-                  unread: snapshot.data ?? 0,
-                ),
-                selectedIcon: _UnreadIcon(
-                  icon: Icons.home_rounded,
-                  unread: snapshot.data ?? 0,
-                ),
-                label: 'Chats',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.badge_outlined),
-                selectedIcon: Icon(Icons.badge_rounded),
-                label: 'Contacts',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.groups_outlined),
-                selectedIcon: Icon(Icons.groups_rounded),
-                label: 'Groups',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.person_outline_rounded),
-                selectedIcon: Icon(Icons.person_rounded),
-                label: 'Profile',
-              ),
-            ],
+    body: IndexedStack(index: selectedIndex, children: pages),
+    bottomNavigationBar: StreamBuilder<int>(
+      stream: unreadStream,
+      initialData: 0,
+      builder: (context, snapshot) => NavigationBar(
+        height: 66,
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (index) {
+          setState(() => selectedIndex = index);
+        },
+        destinations: [
+          NavigationDestination(
+            icon: _UnreadIcon(
+              icon: Icons.home_outlined,
+              unread: snapshot.data ?? 0,
+            ),
+            selectedIcon: _UnreadIcon(
+              icon: Icons.home_rounded,
+              unread: snapshot.data ?? 0,
+            ),
+            label: 'Chats',
           ),
-        ),
-      );
+          const NavigationDestination(
+            icon: Icon(Icons.badge_outlined),
+            selectedIcon: Icon(Icons.badge_rounded),
+            label: 'Contacts',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups_rounded),
+            label: 'Groups',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline_rounded),
+            selectedIcon: Icon(Icons.person_rounded),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _UnreadIcon extends StatelessWidget {
@@ -103,34 +103,34 @@ class _UnreadIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Icon(icon),
-          if (unread > 0)
-            Positioned(
-              top: -7,
-              right: -11,
-              child: Container(
-                constraints: const BoxConstraints(minWidth: 17),
-                height: 17,
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE34B62),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-                child: Text(
-                  unread > 99 ? '99+' : '$unread',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    height: 1,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+    clipBehavior: Clip.none,
+    children: [
+      Icon(icon),
+      if (unread > 0)
+        Positioned(
+          top: -7,
+          right: -11,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 17),
+            height: 17,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE34B62),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+            child: Text(
+              unread > 99 ? '99+' : '$unread',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                height: 1,
+                fontWeight: FontWeight.w800,
               ),
             ),
-        ],
-      );
+          ),
+        ),
+    ],
+  );
 }

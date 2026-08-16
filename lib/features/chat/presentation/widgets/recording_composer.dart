@@ -34,7 +34,10 @@ class RecordingComposer extends StatelessWidget {
         ),
         TextButton(
           onPressed: uploading ? null : onCancel,
-          child: const Text('Cancel', style: TextStyle(color: Color(0xFFE34B62))),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: Color(0xFFE34B62)),
+          ),
         ),
         IconButton.filled(
           style: IconButton.styleFrom(backgroundColor: const Color(0xFFB49ADF)),
@@ -43,7 +46,10 @@ class RecordingComposer extends StatelessWidget {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : const Icon(Icons.send_rounded, size: 19),
         ),
