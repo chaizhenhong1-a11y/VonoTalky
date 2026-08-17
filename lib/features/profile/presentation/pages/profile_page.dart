@@ -91,8 +91,11 @@ class ProfilePage extends StatelessWidget {
                                         '+1 555-0123',
                                     email: email,
                                     birthDate:
-                                        data['birthDate'] as String? ??
-                                        'Dec 12, 1993',
+                                        data['birthDate'] as String? ?? '',
+                                    onBirthDateTap: () => _pickBirthDate(
+                                      context,
+                                      data['birthDate'] as String?,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -196,6 +199,124 @@ class ProfilePage extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+extension on ProfilePage {
+  Future<void> _pickBirthDate(
+    BuildContext context,
+    String? currentValue,
+  ) async {
+    final now = DateTime.now();
+    final current = _parseBirthDate(currentValue);
+
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime(now.year - 18, now.month, now.day),
+      firstDate: DateTime(1900, 1, 1),
+      lastDate: DateTime(now.year, now.month, now.day),
+      initialDatePickerMode: DatePickerMode.year,
+      helpText: 'Select birthday',
+      fieldLabelText: 'Birthday',
+      cancelText: 'Cancel',
+      confirmText: 'Save',
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(
+            context,
+          ).colorScheme.copyWith(primary: const Color(0xFF7653A5)),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (selected == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(service.uid)
+          .set({
+            'birthDate': _formatBirthDate(selected),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Birthday updated')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Birthday could not be updated')),
+        );
+      }
+    }
+  }
+
+  DateTime? _parseBirthDate(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+
+    final iso = DateTime.tryParse(text);
+    if (iso != null) {
+      return DateTime(iso.year, iso.month, iso.day);
+    }
+
+    final match = RegExp(
+      r'^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+'
+      r'(\d{1,2}),\s*(\d{4})$',
+      caseSensitive: false,
+    ).firstMatch(text);
+
+    if (match == null) return null;
+
+    const months = {
+      'jan': 1,
+      'feb': 2,
+      'mar': 3,
+      'apr': 4,
+      'may': 5,
+      'jun': 6,
+      'jul': 7,
+      'aug': 8,
+      'sep': 9,
+      'oct': 10,
+      'nov': 11,
+      'dec': 12,
+    };
+
+    final month = months[match.group(1)!.toLowerCase()];
+    final day = int.tryParse(match.group(2)!);
+    final year = int.tryParse(match.group(3)!);
+
+    if (month == null || day == null || year == null) return null;
+
+    final parsed = DateTime(year, month, day);
+    if (parsed.year != year || parsed.month != month || parsed.day != day) {
+      return null;
+    }
+
+    return parsed;
+  }
+
+  String _formatBirthDate(DateTime value) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[value.month - 1]} ${value.day}, ${value.year}';
   }
 }
 
@@ -360,10 +481,13 @@ class _UserInfo extends StatelessWidget {
     required this.phone,
     required this.email,
     required this.birthDate,
+    required this.onBirthDateTap,
   });
+
   final String phone;
   final String email;
   final String birthDate;
+  final VoidCallback onBirthDateTap;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -372,23 +496,66 @@ class _UserInfo extends StatelessWidget {
       const SizedBox(height: 9),
       _InfoLine(Icons.email_rounded, email),
       const SizedBox(height: 9),
-      _InfoLine(Icons.cake_rounded, birthDate),
+      _InfoLine(
+        Icons.cake_rounded,
+        birthDate.isEmpty ? 'Add birthday' : birthDate,
+        onTap: onBirthDateTap,
+        trailing: const Icon(
+          Icons.calendar_month_rounded,
+          size: 19,
+          color: Color(0xFF7653A5),
+        ),
+      ),
     ],
   );
 }
 
 class _InfoLine extends StatelessWidget {
-  const _InfoLine(this.icon, this.text);
+  const _InfoLine(this.icon, this.text, {this.onTap, this.trailing});
+
   final IconData icon;
   final String text;
+  final VoidCallback? onTap;
+  final Widget? trailing;
+
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Icon(icon, size: 18, color: const Color(0xFF7350A3)),
-      const SizedBox(width: 9),
-      Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final content = Padding(
+      padding: onTap == null
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF7350A3)),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                color: onTap == null
+                    ? const Color(0xFF1B1620)
+                    : const Color(0xFF4F405D),
+                fontWeight: onTap == null ? FontWeight.w400 : FontWeight.w600,
+              ),
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+        ],
+      ),
+    );
+
+    if (onTap == null) return content;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: content,
+      ),
+    );
+  }
 }
 
 class _QuickAction extends StatelessWidget {

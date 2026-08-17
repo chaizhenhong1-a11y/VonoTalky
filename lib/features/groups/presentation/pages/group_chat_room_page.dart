@@ -451,12 +451,16 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                               Expanded(
                                 child: TextField(
                                   controller: controller,
+                                  textAlignVertical: TextAlignVertical.center,
                                   minLines: 1,
                                   maxLines: 4,
                                   decoration: const InputDecoration(
                                     hintText: 'Message the group...',
                                     border: InputBorder.none,
                                     isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
                                   ),
                                   onTap: () {
                                     if (showEmojiPicker) {

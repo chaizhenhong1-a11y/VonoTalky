@@ -4,6 +4,7 @@ import '../../data/models/message_reply.dart';
 
 class MessageReplyCard extends StatelessWidget {
   const MessageReplyCard({super.key, required this.reply, this.onTap});
+
   final MessageReply reply;
   final VoidCallback? onTap;
 
@@ -52,15 +53,16 @@ class ReplyComposerBar extends StatelessWidget {
     super.key,
     required this.reply,
     required this.onClose,
+    this.onTap,
   });
 
   final MessageReply reply;
   final VoidCallback onClose;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.symmetric(horizontal: 8),
-    padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
     decoration: BoxDecoration(
       color: const Color(0xFFF0F1F3),
       borderRadius: BorderRadius.circular(7),
@@ -71,40 +73,53 @@ class ReplyComposerBar extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Replying to ${reply.senderName}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF4F4B52),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: const BorderRadius.horizontal(
+              left: Radius.circular(7),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Replying to ${reply.senderName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF4F4B52),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    reply.preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ],
               ),
-              Text(
-                reply.preview,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11),
-              ),
-            ],
-          ),
-        ),
-        InkWell(
-          onTap: onClose,
-          borderRadius: BorderRadius.circular(16),
-          child: const Padding(
-            padding: EdgeInsets.all(5),
-            child: Icon(
-              Icons.close_rounded,
-              size: 16,
-              color: Color(0xFF77737B),
             ),
           ),
         ),
+        Tooltip(
+          message: 'Cancel reply',
+          child: InkWell(
+            onTap: onClose,
+            borderRadius: BorderRadius.circular(16),
+            child: const Padding(
+              padding: EdgeInsets.all(7),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: Color(0xFF77737B),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 2),
       ],
     ),
   );

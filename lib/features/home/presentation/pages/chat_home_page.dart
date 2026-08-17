@@ -7,6 +7,7 @@ import '../../../chat/presentation/pages/real_chat_room_page.dart';
 import '../../../contacts/presentation/pages/contacts_page.dart';
 import '../../../contacts/data/services/contact_service.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
+import '../../../pet/presentation/pages/pet_home_page.dart';
 import '../../../groups/presentation/pages/create_group_page.dart';
 import '../../data/services/unread_service.dart';
 import '../widgets/unified_recent_chats.dart';
@@ -224,6 +225,12 @@ class _ChatHomePageState extends State<ChatHomePage> {
                   MaterialPageRoute(builder: (_) => const ContactsPage()),
                 );
               }
+              if (index == 2) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PetHomePage()),
+                );
+              }
               if (index == 3) {
                 Navigator.push(
                   context,
@@ -241,8 +248,8 @@ class _ChatHomePageState extends State<ChatHomePage> {
                 label: 'Contacts',
               ),
               NavigationDestination(
-                icon: Icon(Icons.groups_outlined),
-                label: 'Groups',
+                icon: Icon(Icons.pets_rounded),
+                label: 'Pet',
               ),
               NavigationDestination(
                 icon: Icon(Icons.person_outline_rounded),

@@ -1,11 +1,19 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+import '../../../chat/data/models/chat_user.dart';
+import '../../../chat/presentation/pages/real_chat_room_page.dart';
 import '../../../contacts/presentation/pages/contacts_page.dart';
-import '../../../groups/presentation/pages/groups_page.dart';
 import '../../../home/data/services/unread_service.dart';
 import '../../../home/presentation/pages/chat_home_page.dart';
+import '../../../pet/presentation/pages/pet_home_page.dart';
+import '../../../pet/presentation/pages/shared_pet_detail_page.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../presence/data/services/presence_service.dart';
+import '../../../pet/data/services/pet_notification_service.dart';
 
 class MainShellPage extends StatefulWidget {
   const MainShellPage({super.key});
@@ -18,12 +26,14 @@ class _MainShellPageState extends State<MainShellPage>
     with WidgetsBindingObserver {
   int selectedIndex = 0;
   final presence = PresenceService();
+  final petNotifications = PetNotificationService();
+  StreamSubscription<RemoteMessage>? notificationOpenSubscription;
   late final Stream<int> unreadStream = UnreadService().totalUnread();
 
   late final pages = <Widget>[
     const ChatHomePage(embedded: true),
     const ContactsPage(embedded: true),
-    const GroupsPage(),
+    const PetHomePage(),
     ProfilePage(embedded: true),
   ];
 
@@ -32,6 +42,10 @@ class _MainShellPageState extends State<MainShellPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     presence.start();
+    petNotifications.initialize();
+    notificationOpenSubscription = petNotifications.openedMessages.listen(
+      _openNotificationTarget,
+    );
   }
 
   @override
@@ -47,7 +61,69 @@ class _MainShellPageState extends State<MainShellPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     presence.stop();
+    notificationOpenSubscription?.cancel();
+    petNotifications.dispose();
     super.dispose();
+  }
+
+  Future<void> _openNotificationTarget(RemoteMessage message) async {
+    if (!mounted) return;
+
+    final data = message.data;
+    final type = data['type'];
+
+    if (type == 'direct_message') {
+      await _openDirectMessageNotification(data);
+      return;
+    }
+
+    final petId = data['petId'];
+    if (type == 'care_request' && petId is String && petId.isNotEmpty) {
+      setState(() => selectedIndex = 2);
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SharedPetDetailPage(petId: petId),
+        ),
+      );
+      return;
+    }
+
+    if (type == 'pet_invite') {
+      // A new invite does not have a shared pet yet. Pet Center already
+      // contains the real-time invitation inbox, so route there.
+      setState(() => selectedIndex = 2);
+    }
+  }
+
+  Future<void> _openDirectMessageNotification(Map<String, dynamic> data) async {
+    final friendId = data['friendId'];
+
+    // Always land on Chats if the payload is incomplete or the profile
+    // cannot be resolved.
+    setState(() => selectedIndex = 0);
+
+    if (friendId is! String || friendId.isEmpty) {
+      return;
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(friendId)
+          .get();
+
+      if (!mounted || !snapshot.exists) {
+        return;
+      }
+
+      final friend = ChatUser.fromDoc(snapshot);
+
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => RealChatRoomPage(user: friend)),
+      );
+    } catch (_) {
+      // The Chats tab is already visible as a safe fallback.
+    }
   }
 
   @override
@@ -80,9 +156,9 @@ class _MainShellPageState extends State<MainShellPage>
             label: 'Contacts',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.groups_outlined),
-            selectedIcon: Icon(Icons.groups_rounded),
-            label: 'Groups',
+            icon: Icon(Icons.pets_outlined),
+            selectedIcon: Icon(Icons.pets_rounded),
+            label: 'Pet',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),

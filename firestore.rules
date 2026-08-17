@@ -194,6 +194,113 @@ service cloud.firestore {
       }
     }
 
+    // Phase 73: shared pets
+    match /sharedPets/{petId} {
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.memberIds;
+
+      allow create: if request.auth != null
+                    && request.resource.data.memberIds is list
+                    && request.resource.data.memberIds.size() == 2
+                    && request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if request.auth != null
+                    && request.auth.uid in resource.data.memberIds
+                    && request.resource.data.memberIds == resource.data.memberIds;
+
+      allow delete: if request.auth != null
+                    && request.auth.uid in resource.data.memberIds;
+
+      match /memories/{memoryId} {
+        allow read: if request.auth != null
+                    && request.auth.uid in
+                       get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds;
+
+        allow create: if request.auth != null
+                      && request.auth.uid in
+                         get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds
+                      && request.resource.data.actorId == request.auth.uid;
+
+        allow update, delete: if false;
+      }
+
+      match /careRequests/{requestId} {
+        allow read: if request.auth != null
+                    && request.auth.uid in
+                       get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds;
+
+        allow create: if request.auth != null
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.receiverId != request.auth.uid
+                      && request.resource.data.status == 'pending'
+                      && request.resource.data.type in ['feed', 'play', 'pet']
+                      && request.resource.data.senderId in
+                         get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds
+                      && request.resource.data.receiverId in
+                         get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds
+                      && request.resource.data.keys().hasOnly([
+                        'type',
+                        'senderId',
+                        'receiverId',
+                        'status',
+                        'createdAt',
+                        'respondedAt'
+                      ]);
+
+        allow update: if request.auth != null
+                      && request.auth.uid == resource.data.receiverId
+                      && resource.data.status == 'pending'
+                      && request.resource.data.status in ['completed', 'dismissed']
+                      && request.resource.data.senderId == resource.data.senderId
+                      && request.resource.data.receiverId == resource.data.receiverId
+                      && request.resource.data.type == resource.data.type
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['status', 'respondedAt']);
+
+        allow delete: if false;
+      }
+    }
+
+
+    // Phase 74: shared-pet invitations
+    match /petInvites/{inviteId} {
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.memberIds;
+
+      allow create: if request.auth != null
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.receiverId != request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.memberIds is list
+                    && request.resource.data.memberIds.size() == 2
+                    && request.resource.data.senderId in request.resource.data.memberIds
+                    && request.resource.data.receiverId in request.resource.data.memberIds
+                    && request.resource.data.keys().hasOnly([
+                      'memberIds',
+                      'senderId',
+                      'senderName',
+                      'receiverId',
+                      'receiverName',
+                      'petName',
+                      'status',
+                      'createdAt',
+                      'respondedAt',
+                      'petId'
+                    ]);
+
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.receiverId
+                    && resource.data.status == 'pending'
+                    && request.resource.data.status in ['accepted', 'rejected']
+                    && request.resource.data.memberIds == resource.data.memberIds
+                    && request.resource.data.senderId == resource.data.senderId
+                    && request.resource.data.receiverId == resource.data.receiverId
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['status', 'respondedAt', 'petId']);
+
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

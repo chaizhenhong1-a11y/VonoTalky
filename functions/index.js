@@ -1,126 +1,405 @@
-const {onDocumentCreated} = require('firebase-functions/v2/firestore');
-const {initializeApp} = require('firebase-admin/app');
-const {getFirestore, FieldValue} = require('firebase-admin/firestore');
-const {getMessaging} = require('firebase-admin/messaging');
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { logger } = require("firebase-functions");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 
 initializeApp();
-const db = getFirestore();
 
-exports.notifyDirectMessage = onDocumentCreated(
-  'conversations/{conversationId}/messages/{messageId}',
+const db = getFirestore();
+const messaging = getMessaging();
+
+async function getEnabledDeviceTokens(
+  userId,
+  {
+    excludeConversationId = null,
+  } = {},
+) {
+  const snapshot = await db
+    .collection("users")
+    .doc(userId)
+    .collection("devices")
+    .get();
+
+  const tokens = [];
+
+  for (const document of snapshot.docs) {
+    const data = document.data();
+
+    if (data.notificationsEnabled === false) {
+      continue;
+    }
+
+    if (
+      excludeConversationId &&
+      data.activeConversationId === excludeConversationId
+    ) {
+      logger.info("Skipping FCM for device already viewing conversation.", {
+        userId,
+        conversationId: excludeConversationId,
+        deviceId: document.id,
+      });
+      continue;
+    }
+
+    const token = data.fcmToken;
+    if (typeof token === "string" && token.trim().length > 0) {
+      tokens.push(token.trim());
+    }
+  }
+
+  return [...new Set(tokens)];
+}
+
+async function removeInvalidTokens(userId, tokens, response) {
+  const invalidCodes = new Set([
+    "messaging/invalid-registration-token",
+    "messaging/registration-token-not-registered",
+  ]);
+
+  const writes = [];
+
+  response.responses.forEach((result, index) => {
+    if (result.success) return;
+
+    const code = result.error?.code;
+    if (!invalidCodes.has(code)) return;
+
+    const token = tokens[index];
+    if (!token) return;
+
+    const deviceId = token.replaceAll("/", "_");
+
+    writes.push(
+      db
+        .collection("users")
+        .doc(userId)
+        .collection("devices")
+        .doc(deviceId)
+        .set(
+          {
+            notificationsEnabled: false,
+            invalidatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        ),
+    );
+  });
+
+  await Promise.all(writes);
+}
+
+async function sendToUser({
+  userId,
+  title,
+  body,
+  data,
+  excludeConversationId = null,
+}) {
+  const tokens = await getEnabledDeviceTokens(userId, {
+    excludeConversationId,
+  });
+
+  if (tokens.length === 0) {
+    logger.info("No enabled FCM devices for user.", { userId });
+    return {
+      successCount: 0,
+      failureCount: 0,
+    };
+  }
+
+  const response = await messaging.sendEachForMulticast({
+    tokens,
+    notification: {
+      title,
+      body,
+    },
+    data: Object.fromEntries(
+      Object.entries(data).map(([key, value]) => [
+        key,
+        value == null ? "" : String(value),
+      ]),
+    ),
+    android: {
+      priority: "high",
+    },
+    apns: {
+      payload: {
+        aps: {
+          sound: "default",
+        },
+      },
+    },
+  });
+
+  await removeInvalidTokens(userId, tokens, response);
+
+  logger.info("FCM multicast completed.", {
+    userId,
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+    type: data.type,
+  });
+
+  return {
+    successCount: response.successCount,
+    failureCount: response.failureCount,
+  };
+}
+
+exports.onPetInviteCreated = onDocumentCreated(
+  "petInvites/{inviteId}",
   async (event) => {
-    const message = event.data?.data();
-    if (!message || !message.receiverId || message.isDeleted) return;
-    const receiverRef = db.collection('users').doc(message.receiverId);
-    const [sender, receiver, preference] = await Promise.all([
-      db.collection('users').doc(message.senderId).get(),
-      receiverRef.get(),
-      receiverRef.collection('contactPreferences').doc(message.senderId).get(),
-    ]);
-    const settings = receiver.data()?.settings || {};
-    if (settings.pushNotifications === false || preference.data()?.muted === true) {
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const invite = snapshot.data();
+    if (invite.status !== "pending") return;
+
+    const receiverId = invite.receiverId;
+    const senderId = invite.senderId;
+
+    if (
+      typeof receiverId !== "string" ||
+      receiverId.length === 0 ||
+      typeof senderId !== "string" ||
+      senderId.length === 0 ||
+      receiverId === senderId
+    ) {
+      logger.warn("Invalid pet invite notification payload.", {
+        inviteId: event.params.inviteId,
+      });
       return;
     }
-    const senderName = sender.data()?.displayName || 'VonoTalky user';
-    await sendToUsers(
-      [message.receiverId],
-      {
-        title: senderName,
-        body: settings.messagePreview === false
-          ? 'New message'
-          : preview(message),
+
+    const senderName =
+      typeof invite.senderName === "string" &&
+      invite.senderName.trim().length > 0
+        ? invite.senderName.trim()
+        : "A friend";
+
+    const petName =
+      typeof invite.petName === "string" &&
+      invite.petName.trim().length > 0
+        ? invite.petName.trim()
+        : "a pet";
+
+    await sendToUser({
+      userId: receiverId,
+      title: "Raise a pet together 🐾",
+      body: `${senderName} invited you to raise ${petName} together.`,
+      data: {
+        type: "pet_invite",
+        inviteId: event.params.inviteId,
+        friendId: senderId,
+        petId: "",
       },
-      {
-        type: 'direct',
-        senderId: String(message.senderId),
-        conversationId: String(event.params.conversationId),
-      },
-    );
+    });
   },
 );
 
-exports.notifyGroupMessage = onDocumentCreated(
-  'groups/{groupId}/messages/{messageId}',
+exports.onPetCareRequestCreated = onDocumentCreated(
+  "sharedPets/{petId}/careRequests/{requestId}",
   async (event) => {
-    const message = event.data?.data();
-    if (!message || message.isDeleted) return;
-    const group = await db.collection('groups').doc(event.params.groupId).get();
-    if (!group.exists) return;
-    const groupData = group.data();
-    const receivers = (groupData.memberIds || []).filter(
-      (uid) => uid !== message.senderId,
-    );
-    await sendToUsers(
-      receivers,
-      {
-        title: groupData.name || 'Group message',
-        body: `${message.senderName || 'Member'}: ${preview(message)}`,
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const request = snapshot.data();
+    if (request.status !== "pending") return;
+
+    const receiverId = request.receiverId;
+    const senderId = request.senderId;
+
+    if (
+      typeof receiverId !== "string" ||
+      receiverId.length === 0 ||
+      typeof senderId !== "string" ||
+      senderId.length === 0 ||
+      receiverId === senderId
+    ) {
+      logger.warn("Invalid care request notification payload.", {
+        petId: event.params.petId,
+        requestId: event.params.requestId,
+      });
+      return;
+    }
+
+    const petSnapshot = await db
+      .collection("sharedPets")
+      .doc(event.params.petId)
+      .get();
+
+    if (!petSnapshot.exists) {
+      logger.warn("Care request references missing pet.", {
+        petId: event.params.petId,
+      });
+      return;
+    }
+
+    const pet = petSnapshot.data();
+    const members = Array.isArray(pet.memberIds) ? pet.memberIds : [];
+
+    if (!members.includes(receiverId) || !members.includes(senderId)) {
+      logger.warn("Care request users are not pet members.", {
+        petId: event.params.petId,
+        receiverId,
+        senderId,
+      });
+      return;
+    }
+
+    const petName =
+      typeof pet.petName === "string" && pet.petName.trim().length > 0
+        ? pet.petName.trim()
+        : "your pet";
+
+    const memberNames =
+      pet.memberNames && typeof pet.memberNames === "object"
+        ? pet.memberNames
+        : {};
+
+    const senderName =
+      typeof memberNames[senderId] === "string" &&
+      memberNames[senderId].trim().length > 0
+        ? memberNames[senderId].trim()
+        : "Your friend";
+
+    const action = (() => {
+      switch (request.type) {
+        case "feed":
+          return {
+            title: `${petName} is hungry 🍪`,
+            body: `${senderName} asked you to feed ${petName}.`,
+          };
+        case "play":
+          return {
+            title: `${petName} wants to play 🎮`,
+            body: `${senderName} asked you to play with ${petName}.`,
+          };
+        default:
+          return {
+            title: `${petName} needs some love 💗`,
+            body: `${senderName} asked you to pet ${petName}.`,
+          };
+      }
+    })();
+
+    await sendToUser({
+      userId: receiverId,
+      title: action.title,
+      body: action.body,
+      data: {
+        type: "care_request",
+        petId: event.params.petId,
+        careRequestId: event.params.requestId,
+        friendId: senderId,
+        inviteId: "",
       },
-      {
-        type: 'group',
-        groupId: String(event.params.groupId),
-        senderId: String(message.senderId),
-      },
-    );
+    });
   },
 );
 
-function preview(message) {
-  if (message.type === 'image') return '📷 Photo';
-  if (message.type === 'voice') return '🎤 Voice message';
-  if (message.type === 'file') return `📎 ${message.fileName || 'File'}`;
-  const text = String(message.text || '').trim();
-  return text.length > 120 ? `${text.slice(0, 117)}...` : text || 'New message';
-}
+exports.onDirectMessageCreated = onDocumentCreated(
+  "conversations/{conversationId}/messages/{messageId}",
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
 
-async function sendToUsers(userIds, notification, data) {
-  const uniqueIds = [...new Set(userIds)].filter(Boolean);
-  if (!uniqueIds.length) return;
-  const deviceSnapshots = await Promise.all(
-    uniqueIds.map((uid) =>
-      db.collection('users').doc(uid).collection('devices')
-        .where('enabled', '==', true).get(),
-    ),
-  );
-  const devices = [];
-  for (const snapshot of deviceSnapshots) {
-    for (const document of snapshot.docs) {
-      const token = document.data().token;
-      if (token) devices.push({token, reference: document.ref});
+    const message = snapshot.data();
+    const senderId = message.senderId;
+
+    if (typeof senderId !== "string" || senderId.length === 0) {
+      logger.warn("Direct message has no valid senderId.", {
+        conversationId: event.params.conversationId,
+        messageId: event.params.messageId,
+      });
+      return;
     }
-  }
-  for (let start = 0; start < devices.length; start += 500) {
-    const chunk = devices.slice(start, start + 500);
-    const response = await getMessaging().sendEachForMulticast({
-      tokens: chunk.map((device) => device.token),
-      notification,
-      data,
-      android: {
-        priority: 'high',
-        notification: {channelId: 'messages'},
-      },
-      apns: {
-        payload: {aps: {sound: 'default', badge: 1}},
-      },
-    });
-    const staleWrites = [];
-    response.responses.forEach((result, index) => {
-      const code = result.error?.code || '';
-      if (
-        code.includes('registration-token-not-registered') ||
-        code.includes('invalid-registration-token')
-      ) {
-        staleWrites.push(chunk[index].reference.delete());
+
+    const conversationSnapshot = await db
+      .collection("conversations")
+      .doc(event.params.conversationId)
+      .get();
+
+    if (!conversationSnapshot.exists) {
+      logger.warn("Message references a missing conversation.", {
+        conversationId: event.params.conversationId,
+      });
+      return;
+    }
+
+    const conversation = conversationSnapshot.data();
+    const members = Array.isArray(conversation.memberIds)
+      ? conversation.memberIds
+      : [];
+
+    if (!members.includes(senderId) || members.length !== 2) {
+      logger.warn("Invalid direct-message membership.", {
+        conversationId: event.params.conversationId,
+        senderId,
+        memberIds: members,
+      });
+      return;
+    }
+
+    const receiverId = members.find((uid) => uid !== senderId);
+    if (!receiverId) return;
+
+    const senderSnapshot = await db.collection("users").doc(senderId).get();
+    const sender = senderSnapshot.exists ? senderSnapshot.data() : {};
+
+    const senderName =
+      typeof sender.name === "string" && sender.name.trim().length > 0
+        ? sender.name.trim()
+        : typeof sender.displayName === "string" &&
+            sender.displayName.trim().length > 0
+          ? sender.displayName.trim()
+          : typeof sender.username === "string" &&
+              sender.username.trim().length > 0
+            ? sender.username.trim()
+            : "New message";
+
+    const type =
+      typeof message.type === "string" ? message.type.toLowerCase() : "text";
+
+    let body;
+    switch (type) {
+      case "image":
+        body = "📷 Sent a photo";
+        break;
+      case "voice":
+      case "audio":
+        body = "🎤 Voice message";
+        break;
+      case "file":
+        body =
+          typeof message.fileName === "string" &&
+          message.fileName.trim().length > 0
+            ? `📎 ${message.fileName.trim()}`
+            : "📎 Sent a file";
+        break;
+      default: {
+        const text =
+          typeof message.text === "string" ? message.text.trim() : "";
+        body = text.length > 0 ? text.slice(0, 160) : "Sent you a message";
       }
+    }
+
+    await sendToUser({
+      userId: receiverId,
+      title: senderName,
+      body,
+      excludeConversationId: event.params.conversationId,
+      data: {
+        type: "direct_message",
+        conversationId: event.params.conversationId,
+        messageId: event.params.messageId,
+        friendId: senderId,
+        petId: "",
+        inviteId: "",
+        careRequestId: "",
+      },
     });
-    await Promise.all(staleWrites);
-  }
-  await Promise.all(
-    uniqueIds.map((uid) =>
-      db.collection('users').doc(uid).set(
-        {lastNotificationAt: FieldValue.serverTimestamp()},
-        {merge: true},
-      ),
-    ),
-  );
-}
+  },
+);
+
