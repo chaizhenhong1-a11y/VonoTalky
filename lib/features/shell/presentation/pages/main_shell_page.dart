@@ -9,12 +9,11 @@ import '../../../chat/presentation/pages/real_chat_room_page.dart';
 import '../../../contacts/presentation/pages/contacts_page.dart';
 import '../../../home/data/services/unread_service.dart';
 import '../../../home/presentation/pages/chat_home_page.dart';
-import '../../../pet/presentation/pages/pet_home_page.dart';
 import '../../../pet/presentation/pages/shared_pet_detail_page.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../presence/data/services/presence_service.dart';
 import '../../../pet/data/services/pet_notification_service.dart';
-
+import '../../../space/presentation/pages/space.dart';
 class MainShellPage extends StatefulWidget {
   const MainShellPage({super.key});
 
@@ -33,7 +32,7 @@ class _MainShellPageState extends State<MainShellPage>
   late final pages = <Widget>[
     const ChatHomePage(embedded: true),
     const ContactsPage(embedded: true),
-    const PetHomePage(),
+    const Space(),
     ProfilePage(embedded: true),
   ];
 
@@ -156,9 +155,9 @@ class _MainShellPageState extends State<MainShellPage>
             label: 'Contacts',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.pets_outlined),
-            selectedIcon: Icon(Icons.pets_rounded),
-            label: 'Pet',
+            icon: Icon(Icons.park_rounded),
+            selectedIcon: Icon(Icons.park_rounded),
+            label: 'Space',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
