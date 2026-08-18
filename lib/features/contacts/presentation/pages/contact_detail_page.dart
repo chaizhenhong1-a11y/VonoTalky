@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:vonotalky/features/space/presentation/pages/friend_tree_page.dart';
 
 import '../../../chat/data/models/chat_user.dart';
 import '../../data/services/contact_detail_service.dart';
+import '../../../profile/data/services/profile_pet_showcase_service.dart';
+import '../../../profile/presentation/widgets/profile_pet_showcase.dart';
 
 class ContactDetailPage extends StatelessWidget {
   ContactDetailPage({super.key, required this.user, required this.onMessage});
@@ -58,11 +61,27 @@ class ContactDetailPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  _InfoCard(
-                    user: current,
-                  ),
+                  _InfoCard(user: current),
 
                   const SizedBox(height: 16),
+                  StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _petShowcaseService.watchUserShowcase(current.uid),
+                    builder: (context, petSnapshot) {
+                      final pets =
+                          petSnapshot.data ?? const <Map<String, dynamic>>[];
+
+                      if (pets.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Column(
+                        children: [
+                          ProfilePetShowcase(pets: pets, compact: true),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    },
+                  ),
 
                   Material(
                     color: Colors.white,
@@ -73,9 +92,7 @@ class ContactDetailPage extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (context) {
-                              return FriendTreePage(
-                                user: current,
-                              );
+                              return FriendTreePage(user: current);
                             },
                           ),
                         );
@@ -91,30 +108,21 @@ class ContactDetailPage extends StatelessWidget {
                               width: 46,
                               height: 46,
                               decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFFE8F1DF,
-                                ),
-                                borderRadius: BorderRadius.circular(
-                                  14,
-                                ),
+                                color: const Color(0xFFE8F1DF),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               alignment: Alignment.center,
                               child: const Icon(
                                 Icons.park_rounded,
-                                color: Color(
-                                  0xFF668052,
-                                ),
+                                color: Color(0xFF668052),
                               ),
                             ),
 
-                            const SizedBox(
-                              width: 14,
-                            ),
+                            const SizedBox(width: 14),
 
                             const Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     'Visit Tree',
@@ -123,16 +131,12 @@ class ContactDetailPage extends StatelessWidget {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  SizedBox(
-                                    height: 3,
-                                  ),
+                                  SizedBox(height: 3),
                                   Text(
                                     'Leave a tag on their tree',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(
-                                        0xFF837C86,
-                                      ),
+                                      color: Color(0xFF837C86),
                                     ),
                                   ),
                                 ],
@@ -141,9 +145,7 @@ class ContactDetailPage extends StatelessWidget {
 
                             const Icon(
                               Icons.chevron_right_rounded,
-                              color: Color(
-                                0xFFAAA3AC,
-                              ),
+                              color: Color(0xFFAAA3AC),
                             ),
                           ],
                         ),
