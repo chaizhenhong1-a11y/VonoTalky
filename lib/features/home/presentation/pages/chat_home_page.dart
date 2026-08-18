@@ -433,20 +433,25 @@ class _ContactAvatar extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: showRing
-              ? Border.all(color: const Color(0xFF8D68BA), width: 1.5)
+              ? Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1.5,
+                )
               : null,
         ),
         child: CircleAvatar(
           radius: radius,
-          backgroundColor: const Color(0xFFE5DAF5),
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: .12),
           backgroundImage: user.photoUrl == null
               ? null
               : NetworkImage(user.photoUrl!),
           child: user.photoUrl == null
               ? Text(
                   user.name[0].toUpperCase(),
-                  style: const TextStyle(
-                    color: Color(0xFF65439B),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w700,
                   ),
                 )

@@ -7,6 +7,7 @@ import '../../data/services/profile_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key, required this.data});
+
   final Map<String, dynamic> data;
 
   @override
@@ -16,14 +17,14 @@ class EditProfilePage extends StatefulWidget {
 class _EditProfilePageState extends State<EditProfilePage> {
   final formKey = GlobalKey<FormState>();
   final service = ProfileService();
+
   late final name = TextEditingController(
     text: widget.data['displayName'] ?? '',
   );
   late final bio = TextEditingController(text: widget.data['bio'] ?? '');
   late final phone = TextEditingController(text: widget.data['phone'] ?? '');
-  late final birth = TextEditingController(
-    text: widget.data['birthDate'] ?? '',
-  );
+
+  DateTime? selectedBirthday;
   String? photoUrl;
   Uint8List? avatarBytes;
   bool saving = false;
@@ -31,6 +32,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
+    selectedBirthday = _parseBirthday(widget.data['birthDate'] as String?);
     photoUrl = widget.data['photoUrl'] as String?;
   }
 
@@ -39,21 +41,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
     name.dispose();
     bio.dispose();
     phone.dispose();
-    birth.dispose();
     super.dispose();
   }
 
   Future<void> save() async {
     if (!formKey.currentState!.validate()) return;
+
     setState(() => saving = true);
+
     try {
       await service.update(
         displayName: name.text,
         bio: bio.text,
         phone: phone.text,
-        birthDate: birth.text,
+        birthDate: _birthdayStorageValue(selectedBirthday),
       );
-      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -61,13 +67,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
       }
     } finally {
-      if (mounted) setState(() => saving = false);
+      if (mounted) {
+        setState(() => saving = false);
+      }
     }
   }
 
   Future<void> changePhoto() async {
     try {
       final result = await service.pickAndUploadAvatar();
+
       if (result != null && mounted) {
         setState(() {
           photoUrl = result.url;
@@ -81,6 +90,85 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ).showSnackBar(const SnackBar(content: Text('Avatar upload failed')));
       }
     }
+  }
+
+  DateTime? _parseBirthday(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+
+    final normalized = raw.trim();
+    final iso = DateTime.tryParse(normalized);
+    if (iso != null) return iso;
+
+    final slashParts = normalized.split('/');
+    if (slashParts.length == 3) {
+      final day = int.tryParse(slashParts[0]);
+      final month = int.tryParse(slashParts[1]);
+      final year = int.tryParse(slashParts[2]);
+
+      if (day != null && month != null && year != null) {
+        try {
+          return DateTime(year, month, day);
+        } catch (_) {
+          return null;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  String _birthdayStorageValue(DateTime? value) {
+    if (value == null) return '';
+
+    final year = value.year.toString().padLeft(4, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+
+    return '$year-$month-$day';
+  }
+
+  String _birthdayDisplayValue(DateTime? value) {
+    if (value == null) return 'Add birthday';
+
+    const months = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+
+    return '${value.day} ${months[value.month - 1]} ${value.year}';
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+
+    final initial =
+        selectedBirthday ?? DateTime(now.year - 18, now.month, now.day);
+
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900, 1, 1),
+      lastDate: DateTime(now.year, now.month, now.day),
+      helpText: 'Select birthday',
+      cancelText: 'Cancel',
+      confirmText: 'Done',
+    );
+
+    if (selected == null || !mounted) return;
+
+    setState(() {
+      selectedBirthday = DateTime(selected.year, selected.month, selected.day);
+    });
   }
 
   @override
@@ -138,13 +226,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
             decoration: const InputDecoration(labelText: 'Phone number'),
           ),
           const SizedBox(height: 14),
-          TextFormField(
-            controller: birth,
-            decoration: const InputDecoration(
-              labelText: 'Date of birth',
-              hintText: 'DD/MM/YYYY',
+          InkWell(
+            onTap: _pickBirthday,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Birthday',
+                suffixIcon: Icon(Icons.calendar_month_rounded),
+              ),
+              child: Text(
+                _birthdayDisplayValue(selectedBirthday),
+                style: TextStyle(
+                  color: selectedBirthday == null
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
+          if (selectedBirthday != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  setState(() => selectedBirthday = null);
+                },
+                child: const Text('Clear birthday'),
+              ),
+            ),
           const SizedBox(height: 26),
           SizedBox(
             height: 52,

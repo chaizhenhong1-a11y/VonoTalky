@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../chat/data/models/chat_user.dart';
 import '../../data/services/contact_detail_service.dart';
+import '../../../profile/data/services/profile_pet_showcase_service.dart';
+import '../../../profile/presentation/widgets/profile_pet_showcase.dart';
 
 class ContactDetailPage extends StatelessWidget {
   ContactDetailPage({super.key, required this.user, required this.onMessage});
@@ -9,6 +11,8 @@ class ContactDetailPage extends StatelessWidget {
   final ChatUser user;
   final VoidCallback onMessage;
   final ContactDetailService _service = ContactDetailService();
+  final ProfilePetShowcaseService _petShowcaseService =
+      ProfilePetShowcaseService();
 
   @override
   Widget build(BuildContext context) => StreamBuilder<ChatUser?>(
@@ -57,6 +61,24 @@ class ContactDetailPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   _InfoCard(user: current),
                   const SizedBox(height: 16),
+                  StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _petShowcaseService.watchUserShowcase(current.uid),
+                    builder: (context, petSnapshot) {
+                      final pets =
+                          petSnapshot.data ?? const <Map<String, dynamic>>[];
+
+                      if (pets.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Column(
+                        children: [
+                          ProfilePetShowcase(pets: pets, compact: true),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    },
+                  ),
                   StreamBuilder<Map<String, dynamic>>(
                     stream: _service.preferences(current.uid),
                     builder: (context, snapshot) {

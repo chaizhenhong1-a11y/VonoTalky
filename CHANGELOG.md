@@ -4,6 +4,100 @@ All notable changes to VonoTalky are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Phase 105.2.5 makes the Chats home screen accent UI follow the active app theme color.
+- Top Contacts avatar rings, placeholder avatar colors, Archived Chats, pin/group/draft accents, unread badges, swipe actions, action icons, and empty-state icons now derive from `Theme.of(context).colorScheme.primary`.
+- Online presence indicators remain green because they represent status rather than the selected theme color.
+
+
+### Changed
+
+- Phase 105.2.4 makes the Settings Sign Out row follow the app's purple theme.
+- The row now uses a primary-color icon, light primary icon container, normal text, neutral border, and neutral chevron.
+- Red is reserved for the final confirmation action after the user taps Sign Out.
+
+
+### Changed
+
+- Phase 105.2.3 moves Sign Out out of the Profile page and into the bottom of Settings.
+- Profile is now focused only on identity, personal information, QR code, and pet showcase content.
+- Settings now owns the account exit action with a dedicated red Sign Out row.
+- Existing sign-out confirmation, presence-offline update, and Firebase Auth sign-out behavior are preserved.
+
+
+### Fixed
+
+- Phase 105.2.2 fixes bottom overflow in the Profile Pet Showcase badge cards.
+- Increased showcase row height so pet name and level fit on compact visitor profiles without clipping.
+- Slightly reduced badge width, icon size, padding, and text size for a cleaner collectible-badge proportion.
+- Pet showcase data, public visibility, selection limit, and visitor display behavior are unchanged.
+
+
+### Fixed
+
+- Phase 105.2.1 adds the public Pet Showcase directly to the real `ContactDetailPage` implementation instead of relying on a fragile one-time patch script.
+- Visitor profiles now display the selected pet badges immediately after the public contact information card.
+- Empty showcases remain hidden so visitor profiles stay clean.
+- No private contact notes, pet documents, or private pet state are exposed.
+
+
+### Changed
+
+- Phase 105.2 replaces the previous single Pet profile card/toggle with a badge-style Pet Showcase.
+- Users can choose up to 3 owned pets to display publicly on their profile.
+- Pet showcase items are deliberately denormalized into the public user profile document so visitors can see the selected badge summary without gaining access to private `sharedPets` data.
+- Contact Detail pages can display the selected public pet badges for other users.
+
+### Added
+
+- Added a Pet Showcase editor with multi-select and a maximum of 3 displayed pets.
+- Added reusable `ProfilePetShowcase` badge UI for both own Profile and visitor Profile.
+- Added `profilePetShowcase` user-document field containing only `petId`, `name`, and `level` summaries.
+
+
+### Fixed
+
+- Phase 105.1.2 fixes the Profile QR Code bottom sheet overflowing on short/small viewports.
+- QR size now scales with available screen height and stays between 150 px and 210 px.
+- Added a safe maximum sheet height, scrolling fallback, and bottom SafeArea spacing.
+- QR Code remains square and readable without being clipped by the bottom navigation/system area.
+- Added the VonoTalky user ID below the QR for manual verification/copying.
+
+
+### Fixed
+
+- Phase 105.1.1 replaces the incomplete birthday patch with a full `EditProfilePage` implementation.
+- Removed the accidental `intl` dependency and all `DateFormat` usage.
+- Birthday now uses the native Flutter date picker instead of a free-text field.
+- Saving writes Birthday directly as `yyyy-MM-dd`.
+- Existing legacy `DD/MM/YYYY` birthday values are also parsed when opening Edit Profile.
+- Added a clear-birthday action without reopening the keyboard.
+
+
+### Changed
+
+- Phase 105.1 changes Birthday editing from free-text input to the platform date picker.
+- Birthday is displayed in a locale-friendly format such as `18 Aug 2005`.
+- Birthday is stored consistently as `yyyy-MM-dd` so Profile display and privacy logic remain stable.
+- The birthday picker prevents selecting future dates and supports dates back to 1900.
+- Existing `Only me` / `Public` birthday visibility is preserved.
+
+### Changed
+
+- Phase 105 redesigns Profile with an Instagram-inspired information hierarchy: avatar on the left, name/username on the right, left-aligned bio, and compact profile actions.
+- Removed the large gradient hero, offline/last-seen label, Quick Actions dashboard, Activity chart, and oversized QR card from Profile.
+- Moved Settings to the Profile AppBar and moved Saved Messages, Shared Media, and Privacy & Security into Settings.
+- Profile and Settings accent icons now derive from `Theme.colorScheme.primary`, so icon containers follow the active theme color.
+- Added a Shared Media directory in Settings that lets users choose a direct conversation before opening its shared photos/files/voice content.
+
+### Added
+
+- Added independent `Only me` / `Public` visibility controls for Phone, Email, and Birthday using the user document `profileVisibility` map.
+- Added a compact Pet section at the bottom of Profile with a `showPetOnProfile` visibility switch.
+- Added a compact QR Code bottom sheet instead of permanently occupying Profile screen space.
+
+
 ### Fixed
 
 - Phase 104.8.4: repaired the malformed AppBar online-status Dart collection-if that caused the 254-line analyzer/editor error cascade.
