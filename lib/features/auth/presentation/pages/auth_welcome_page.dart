@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/theme_controller.dart';
+
 import '../widgets/auth_background.dart';
 import 'login_page.dart';
 import 'register_page.dart';
@@ -58,9 +60,10 @@ class AuthWelcomePage extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const RegisterPage()),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0x66B49ADF),
+              backgroundColor: VonoThemeController.instance.value.color.seed
+                  .withValues(alpha: .24),
               foregroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xD9FFFFFF), width: 1.2),
+              side: const BorderSide(color: Color(0xE6FFFFFF), width: 1.25),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(17),
               ),
@@ -81,7 +84,7 @@ class AuthWelcomePage extends StatelessWidget {
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
-              backgroundColor: const Color(0x0AFFFFFF),
+              backgroundColor: const Color(0x08FFFFFF),
               side: const BorderSide(color: Color(0xE6FFFFFF), width: 1.2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(17),

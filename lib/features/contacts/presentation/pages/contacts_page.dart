@@ -24,13 +24,17 @@ class _ContactsPageState extends State<ContactsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9F7FC),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     body: Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.topRight,
-          colors: [Color(0xFFF8DCEB), Color(0xFFEBDDF5), Color(0xFFDCCFF3)],
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: .18),
+            Theme.of(context).colorScheme.secondary.withValues(alpha: .13),
+            Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+          ],
         ),
       ),
       child: SafeArea(
@@ -40,13 +44,13 @@ class _ContactsPageState extends State<ContactsPage> {
               padding: const EdgeInsets.fromLTRB(18, 12, 10, 6),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'VonoTalky',
                       style: TextStyle(
                         fontSize: 25,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF5F3792),
+                        color: Theme.of(context).colorScheme.primary,
                         letterSpacing: -0.6,
                       ),
                     ),
@@ -77,7 +81,7 @@ class _ContactsPageState extends State<ContactsPage> {
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: const Icon(Icons.mic_none_rounded),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Theme.of(context).colorScheme.surface,
                   isDense: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -88,9 +92,11 @@ class _ContactsPageState extends State<ContactsPage> {
             ),
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF9F7FC),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
                 ),
                 child: StreamBuilder<List<ChatUser>>(
                   stream: contactService.contacts(),
@@ -166,7 +172,7 @@ class _ContactsPageState extends State<ContactsPage> {
     ),
     floatingActionButton: FloatingActionButton.extended(
       heroTag: null,
-      backgroundColor: const Color(0xFF805BB3),
+      backgroundColor: Theme.of(context).colorScheme.primary,
       foregroundColor: Colors.white,
       onPressed: () => Navigator.push(
         context,

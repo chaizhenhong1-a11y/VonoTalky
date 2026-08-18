@@ -5,12 +5,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import 'app/app.dart';
+import 'app/theme/theme_controller.dart';
 import 'firebase_options.dart';
 import 'features/notifications/data/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await VonoThemeController.instance.initialize();
   runApp(const VonoTalkyApp());
 
   // Do not block the first frame while notification permissions and tokens are

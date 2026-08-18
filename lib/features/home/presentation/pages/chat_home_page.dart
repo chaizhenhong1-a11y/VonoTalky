@@ -35,14 +35,18 @@ class _ChatHomePageState extends State<ChatHomePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF9F7FC),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     body: Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.topRight,
-          colors: [Color(0xFFF8DCEB), Color(0xFFEBDDF5), Color(0xFFDCCFF3)],
-          stops: [0, 0.5, 1],
+          colors: [
+            Theme.of(context).colorScheme.primary.withValues(alpha: .18),
+            Theme.of(context).colorScheme.secondary.withValues(alpha: .13),
+            Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+          ],
+          stops: const [0, 0.5, 1],
         ),
       ),
       child: SafeArea(
@@ -52,13 +56,13 @@ class _ChatHomePageState extends State<ChatHomePage> {
               padding: const EdgeInsets.fromLTRB(18, 14, 10, 6),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'VonoTalky',
                       style: TextStyle(
                         fontSize: 25,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF5F3792),
+                        color: Theme.of(context).colorScheme.primary,
                         letterSpacing: -0.6,
                       ),
                     ),
@@ -96,7 +100,7 @@ class _ChatHomePageState extends State<ChatHomePage> {
                           icon: const Icon(Icons.close_rounded),
                         ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: Theme.of(context).colorScheme.surface,
                   isDense: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -109,11 +113,11 @@ class _ChatHomePageState extends State<ChatHomePage> {
             Expanded(
               child: Stack(
                 children: [
-                  const Positioned.fill(
+                  Positioned.fill(
                     top: 27,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Color(0xFFF9F7FC),
+                        color: Theme.of(context).scaffoldBackgroundColor,
                         borderRadius: BorderRadius.vertical(
                           top: Radius.circular(24),
                         ),
@@ -209,7 +213,7 @@ class _ChatHomePageState extends State<ChatHomePage> {
     floatingActionButton: FloatingActionButton.extended(
       heroTag: null,
       onPressed: _showCreateMenu,
-      backgroundColor: const Color(0xFF805BB3),
+      backgroundColor: Theme.of(context).colorScheme.primary,
       foregroundColor: Colors.white,
       icon: const Icon(Icons.edit_rounded, size: 19),
       label: const Text('New Chat'),

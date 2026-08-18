@@ -32,7 +32,7 @@ class ProfilePage extends StatelessWidget {
         final photo = data['photoUrl'] as String?;
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF7F4F9),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
@@ -63,7 +63,7 @@ class ProfilePage extends StatelessWidget {
                                 14,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.surface,
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: const [
                                   BoxShadow(
@@ -76,12 +76,14 @@ class ProfilePage extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'User Info',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1B1620),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 10),
@@ -221,11 +223,9 @@ extension on ProfilePage {
       cancelText: 'Cancel',
       confirmText: 'Save',
       builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(
-            context,
-          ).colorScheme.copyWith(primary: const Color(0xFF7653A5)),
-        ),
+        data: Theme.of(
+          context,
+        ).copyWith(colorScheme: Theme.of(context).colorScheme),
         child: child!,
       ),
     );

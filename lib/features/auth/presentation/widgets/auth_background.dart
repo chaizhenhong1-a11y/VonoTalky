@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/theme_controller.dart';
+
 class AuthBackground extends StatelessWidget {
   const AuthBackground({
     super.key,
@@ -13,88 +15,108 @@ class AuthBackground extends StatelessWidget {
   final bool showBackButton;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    resizeToAvoidBottomInset: true,
-    body: Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          'assets/images/auth_mountain.jpg',
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          errorBuilder: (_, _, _) => const DecoratedBox(
+  Widget build(BuildContext context) {
+    final preferences = VonoThemeController.instance.value;
+    final themeColor = preferences.color;
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            themeColor.authAssetPath,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFFB8A3DB), Color(0xFFF0DCEB)],
+                colors: [
+                  Colors.black.withValues(alpha: .02),
+                  themeColor.authOverlay.withValues(alpha: .05),
+                  const Color(0x30000000),
+                ],
+                stops: const [0, .46, 1],
               ),
             ),
           ),
-        ),
-        SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: constraints.maxHeight - 38,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _TopBar(showBackButton: showBackButton),
-                    const SizedBox(height: 110),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 380),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                            child: Container(
-                              padding: const EdgeInsets.fromLTRB(
-                                22,
-                                22,
-                                22,
-                                18,
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - 38,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _TopBar(
+                        showBackButton: showBackButton,
+                        themeColor: themeColor,
+                      ),
+                      const SizedBox(height: 110),
+                      Align(
+                        alignment: Alignment.bottomCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 380),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 4.5,
+                                sigmaY: 4.5,
                               ),
-                              decoration: BoxDecoration(
-                                color: const Color(0x03FFFFFF),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: const Color(0xCCFFFFFF),
-                                  width: 1.2,
+                              child: Container(
+                                padding: const EdgeInsets.fromLTRB(
+                                  22,
+                                  22,
+                                  22,
+                                  18,
                                 ),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x120E0717),
-                                    blurRadius: 10,
-                                    offset: Offset(0, 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x14100B1A),
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: .42),
+                                    width: 2.2,
                                   ),
-                                ],
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: themeColor.seed.withValues(
+                                        alpha: .10,
+                                      ),
+                                      blurRadius: 18,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: child,
                               ),
-                              child: child,
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.showBackButton});
+  const _TopBar({required this.showBackButton, required this.themeColor});
+
   final bool showBackButton;
+  final VonoThemeColor themeColor;
 
   @override
   Widget build(BuildContext context) => Row(
@@ -103,7 +125,7 @@ class _TopBar extends StatelessWidget {
         IconButton.filledTonal(
           onPressed: () => Navigator.pop(context),
           style: IconButton.styleFrom(
-            backgroundColor: const Color(0x40FFFFFF),
+            backgroundColor: const Color(0x30000000),
             foregroundColor: Colors.white,
           ),
           icon: const Icon(Icons.arrow_back_rounded),
@@ -113,8 +135,16 @@ class _TopBar extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: const Color(0xFFB49ADF),
+            gradient: LinearGradient(
+              colors: [themeColor.seed, themeColor.secondary],
+            ),
             borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: themeColor.seed.withValues(alpha: .4),
+                blurRadius: 16,
+              ),
+            ],
           ),
           child: const Icon(Icons.forum_rounded, color: Colors.white),
         ),
@@ -125,7 +155,7 @@ class _TopBar extends StatelessWidget {
           color: Colors.white,
           fontSize: 22,
           fontWeight: FontWeight.w900,
-          shadows: [Shadow(color: Color(0x55000000), blurRadius: 8)],
+          shadows: [Shadow(color: Color(0x88000000), blurRadius: 10)],
         ),
       ),
     ],

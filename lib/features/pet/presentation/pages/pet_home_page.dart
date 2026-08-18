@@ -20,7 +20,7 @@ class _PetHomePageState extends State<PetHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF8FB),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: StreamBuilder<List<SharedPet>>(
           stream: service.watchMyPets(),
@@ -99,9 +99,13 @@ class _PetHomePageState extends State<PetHomePage> {
           margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: const Color(0xFFFFDDE8)),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: .18),
+            ),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x0B000000),
@@ -115,12 +119,14 @@ class _PetHomePageState extends State<PetHomePage> {
             children: [
               Row(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 20,
-                    backgroundColor: Color(0xFFFFEDF4),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: .12),
                     child: Icon(
                       Icons.mail_outline_rounded,
-                      color: Color(0xFFFF6F9D),
+                      color: Theme.of(context).colorScheme.primary,
                       size: 19,
                     ),
                   ),
@@ -154,7 +160,7 @@ class _PetHomePageState extends State<PetHomePage> {
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF668F),
+                      color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(13),
                     ),
                     child: Text(
@@ -241,7 +247,7 @@ class _PetHomePageState extends State<PetHomePage> {
           FilledButton(
             onPressed: () => _acceptInvite(invite),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF9B6CC5),
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12),
             ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/theme_controller.dart';
+
 import '../../../../app/router/app_routes.dart';
 import '../../data/services/auth_service.dart';
 import '../widgets/auth_background.dart';
@@ -137,9 +139,10 @@ class _LoginPageState extends State<LoginPage> {
               child: FilledButton(
                 onPressed: loading ? null : _submit,
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0x66B49ADF),
+                  backgroundColor: VonoThemeController.instance.value.color.seed
+                      .withValues(alpha: .24),
                   foregroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xB3FFFFFF)),
+                  side: const BorderSide(color: Color(0xD9FFFFFF), width: 1.15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),

@@ -194,7 +194,10 @@ class _UnreadIcon extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFE34B62),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white, width: 1.5),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.surface,
+                width: 1.5,
+              ),
             ),
             child: Text(
               unread > 99 ? '99+' : '$unread',

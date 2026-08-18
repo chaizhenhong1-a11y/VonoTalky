@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/theme_controller.dart';
 import '../../data/services/settings_service.dart';
+import 'appearance_page.dart';
 
 class SettingsPage extends StatelessWidget {
   SettingsPage({super.key});
@@ -9,13 +11,13 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF7F4F9),
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     appBar: AppBar(
       title: const Text(
         'Settings',
         style: TextStyle(fontWeight: FontWeight.w800),
       ),
-      backgroundColor: const Color(0xFFF7F4F9),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       surfaceTintColor: Colors.transparent,
     ),
     body: StreamBuilder<Map<String, dynamic>>(
@@ -92,11 +94,19 @@ class SettingsPage extends StatelessWidget {
                   onTap: () => _comingSoon(context),
                 ),
                 const _Divider(),
-                _NavigationTile(
-                  icon: Icons.dark_mode_rounded,
-                  title: 'Appearance',
-                  trailing: 'Light',
-                  onTap: () => _comingSoon(context),
+                ValueListenableBuilder<VonoThemePreferences>(
+                  valueListenable: VonoThemeController.instance,
+                  builder: (context, preferences, _) => _NavigationTile(
+                    icon: Icons.palette_rounded,
+                    title: 'Appearance',
+                    trailing:
+                        '${_themeModeLabel(preferences.mode)} · ${preferences.color.label}',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AppearancePage(),
+                      ),
+                    ),
+                  ),
                 ),
                 const _Divider(),
                 _NavigationTile(
@@ -128,6 +138,12 @@ class SettingsPage extends StatelessWidget {
     ),
   );
 
+  static String _themeModeLabel(ThemeMode mode) => switch (mode) {
+    ThemeMode.system => 'System',
+    ThemeMode.light => 'Light',
+    ThemeMode.dark => 'Dark',
+  };
+
   static void _comingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('This option is coming next.')),
@@ -144,8 +160,8 @@ class _SectionTitle extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(5, 18, 5, 8),
     child: Text(
       text,
-      style: const TextStyle(
-        color: Color(0xFF7653A5),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
         fontSize: 13,
         fontWeight: FontWeight.w800,
       ),
@@ -160,7 +176,7 @@ class _SettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(18),
       boxShadow: const [
         BoxShadow(
@@ -193,7 +209,7 @@ class _SwitchTile extends StatelessWidget {
   Widget build(BuildContext context) => SwitchListTile(
     value: value,
     onChanged: onChanged,
-    activeTrackColor: const Color(0xFFB593E4),
+    activeTrackColor: Theme.of(context).colorScheme.primary,
     secondary: _IconBox(icon),
     title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
     subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
@@ -226,11 +242,17 @@ class _NavigationTile extends StatelessWidget {
         if (trailing != null)
           Text(
             trailing!,
-            style: const TextStyle(color: Color(0xFF817989), fontSize: 12),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
         if (onTap != null) ...[
           const SizedBox(width: 5),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF817989)),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ],
       ],
     ),
@@ -246,10 +268,10 @@ class _IconBox extends StatelessWidget {
     width: 38,
     height: 38,
     decoration: BoxDecoration(
-      color: const Color(0xFFF0E8FC),
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: .12),
       borderRadius: BorderRadius.circular(11),
     ),
-    child: Icon(icon, color: const Color(0xFF7653A5), size: 21),
+    child: Icon(icon, color: Theme.of(context).colorScheme.primary, size: 21),
   );
 }
 
@@ -257,10 +279,10 @@ class _Divider extends StatelessWidget {
   const _Divider();
 
   @override
-  Widget build(BuildContext context) => const Divider(
+  Widget build(BuildContext context) => Divider(
     height: 1,
     indent: 66,
     endIndent: 14,
-    color: Color(0xFFEDE8F0),
+    color: Theme.of(context).dividerColor,
   );
 }
