@@ -2,17 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../../auth/data/services/auth_service.dart';
-import '../../../presence/data/services/presence_service.dart';
 import '../../data/services/profile_service.dart';
+import '../../data/services/profile_pet_showcase_service.dart';
+import '../widgets/profile_pet_showcase.dart';
 import 'edit_profile_page.dart';
-import 'privacy_security_page.dart';
+import 'pet_showcase_editor_page.dart';
 import 'settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   ProfilePage({super.key, this.embedded = false});
+
   final bool embedded;
-  final service = ProfileService();
+  final ProfileService service = ProfileService();
+  final ProfilePetShowcaseService petShowcaseService =
+      ProfilePetShowcaseService();
 
   @override
   Widget build(BuildContext context) {
@@ -24,148 +27,206 @@ class ProfilePage extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
+
         final data = snapshot.data!.data() ?? <String, dynamic>{};
         final rawName = (data['displayName'] as String? ?? '').trim();
         final name = rawName.isEmpty ? 'VonoTalky User' : rawName;
-        final email = data['email'] as String? ?? '';
+        final username = (data['username'] as String? ?? '').trim();
         final bio = (data['bio'] as String? ?? '').trim();
-        final photo = data['photoUrl'] as String?;
+        final phone = (data['phone'] as String? ?? '').trim();
+        final email = (data['email'] as String? ?? '').trim();
+        final birthday = (data['birthDate'] as String? ?? '').trim();
+        final photoUrl = data['photoUrl'] as String?;
+
+        final visibility = Map<String, dynamic>.from(
+          data['profileVisibility'] as Map? ?? const <String, dynamic>{},
+        );
 
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          appBar: AppBar(
+            title: const Text(
+              'Profile',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            centerTitle: false,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            surfaceTintColor: Colors.transparent,
+            actions: [
+              IconButton(
+                tooltip: 'Settings',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SettingsPage()),
+                ),
+                icon: Icon(
+                  Icons.settings_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+          ),
           body: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _TopProfile(
-                      name: name,
-                      username: data['username'] as String? ?? '',
-                      bio: bio.isEmpty
-                          ? 'Designing pixels & exploring peaks 🏔️'
-                          : bio,
-                      photoUrl: photo,
-                    ),
-                    Transform.translate(
-                      offset: const Offset(0, -22),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(
-                                15,
-                                14,
-                                15,
-                                14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x17000000),
-                                    blurRadius: 10,
-                                    offset: Offset(0, 4),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 100),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _ProfileHeader(
+                            name: name,
+                            username: username,
+                            bio: bio,
+                            photoUrl: photoUrl,
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          EditProfilePage(data: data),
+                                    ),
                                   ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    'User Info',
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(42),
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withValues(alpha: .10),
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Edit Profile',
                                     style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _showQrCode(context, service.uid, name),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(42),
+                                    side: BorderSide(
                                       color: Theme.of(
                                         context,
-                                      ).colorScheme.onSurface,
+                                      ).colorScheme.outlineVariant,
                                     ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _UserInfo(
-                                    phone:
-                                        data['phone'] as String? ??
-                                        '+1 555-0123',
-                                    email: email,
-                                    birthDate:
-                                        data['birthDate'] as String? ?? '',
-                                    onBirthDateTap: () => _pickBirthDate(
+                                    foregroundColor: Theme.of(
                                       context,
-                                      data['birthDate'] as String?,
+                                    ).colorScheme.onSurface,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _Title('Quick Actions'),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QuickAction(
-                              icon: Icons.edit_rounded,
-                              label: 'Edit Profile',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => EditProfilePage(data: data),
+                                  icon: const Icon(
+                                    Icons.qr_code_2_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'QR Code',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: _QuickAction(
-                              icon: Icons.settings_rounded,
-                              label: 'Settings',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => SettingsPage(),
+                          const SizedBox(height: 28),
+                          const _SectionLabel('Personal information'),
+                          const SizedBox(height: 8),
+                          _InfoGroup(
+                            children: [
+                              _VisibilityInfoRow(
+                                label: 'Phone',
+                                value: phone.isEmpty ? 'Add phone' : phone,
+                                isPublic:
+                                    (visibility['phone'] as String?) ==
+                                    'public',
+                                onVisibilityTap: () => _setVisibility(
+                                  context,
+                                  key: 'phone',
+                                  currentlyPublic:
+                                      (visibility['phone'] as String?) ==
+                                      'public',
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: _QuickAction(
-                              icon: Icons.shield_rounded,
-                              label: 'Privacy &\nSecurity',
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PrivacySecurityPage(),
+                              const _SoftDivider(),
+                              _VisibilityInfoRow(
+                                label: 'Email',
+                                value: email.isEmpty ? 'Add email' : email,
+                                isPublic:
+                                    (visibility['email'] as String?) ==
+                                    'public',
+                                onVisibilityTap: () => _setVisibility(
+                                  context,
+                                  key: 'email',
+                                  currentlyPublic:
+                                      (visibility['email'] as String?) ==
+                                      'public',
                                 ),
                               ),
+                              const _SoftDivider(),
+                              _VisibilityInfoRow(
+                                label: 'Birthday',
+                                value: birthday.isEmpty
+                                    ? 'Add birthday'
+                                    : birthday,
+                                isPublic:
+                                    (visibility['birthday'] as String?) ==
+                                    'public',
+                                onVisibilityTap: () => _setVisibility(
+                                  context,
+                                  key: 'birthday',
+                                  currentlyPublic:
+                                      (visibility['birthday'] as String?) ==
+                                      'public',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 28),
+                          StreamBuilder<List<Map<String, dynamic>>>(
+                            stream: petShowcaseService.watchUserShowcase(
+                              service.uid,
                             ),
+                            builder: (context, showcaseSnapshot) {
+                              return ProfilePetShowcase(
+                                pets:
+                                    showcaseSnapshot.data ??
+                                    const <Map<String, dynamic>>[],
+                                onEdit: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const PetShowcaseEditorPage(),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
-                      const SizedBox(height: 13),
-                      const _Title('Activity'),
-                      _Activity(service: service),
-                      const SizedBox(height: 11),
-                      _ContactQr(uid: service.uid, name: name),
-                      const SizedBox(height: 14),
-                      const _SignOutButton(),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -177,7 +238,9 @@ class ProfilePage extends StatelessWidget {
                   height: 66,
                   selectedIndex: 3,
                   onDestinationSelected: (index) {
-                    if (index == 0) Navigator.pop(context);
+                    if (index == 0) {
+                      Navigator.pop(context);
+                    }
                   },
                   destinations: const [
                     NavigationDestination(
@@ -202,624 +265,361 @@ class ProfilePage extends StatelessWidget {
       },
     );
   }
-}
 
-extension on ProfilePage {
-  Future<void> _pickBirthDate(
-    BuildContext context,
-    String? currentValue,
-  ) async {
-    final now = DateTime.now();
-    final current = _parseBirthDate(currentValue);
-
-    final selected = await showDatePicker(
+  Future<void> _setVisibility(
+    BuildContext context, {
+    required String key,
+    required bool currentlyPublic,
+  }) async {
+    final next = await showModalBottomSheet<String>(
       context: context,
-      initialDate: current ?? DateTime(now.year - 18, now.month, now.day),
-      firstDate: DateTime(1900, 1, 1),
-      lastDate: DateTime(now.year, now.month, now.day),
-      initialDatePickerMode: DatePickerMode.year,
-      helpText: 'Select birthday',
-      fieldLabelText: 'Birthday',
-      cancelText: 'Cancel',
-      confirmText: 'Save',
-      builder: (context, child) => Theme(
-        data: Theme.of(
-          context,
-        ).copyWith(colorScheme: Theme.of(context).colorScheme),
-        child: child!,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.lock_outline_rounded),
+                title: const Text('Only me'),
+                trailing: !currentlyPublic
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : null,
+                onTap: () => Navigator.pop(sheetContext, 'private'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.public_rounded),
+                title: const Text('Public'),
+                trailing: currentlyPublic
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : null,
+                onTap: () => Navigator.pop(sheetContext, 'public'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
 
-    if (selected == null) return;
+    if (next == null) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(service.uid)
-          .set({
-            'birthDate': _formatBirthDate(selected),
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Birthday updated')));
-      }
+      await FirebaseFirestore.instance.collection('users').doc(service.uid).set(
+        {
+          'profileVisibility': {key: next},
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
     } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Birthday could not be updated')),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update visibility')),
+      );
     }
   }
 
-  DateTime? _parseBirthDate(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return null;
+  Future<void> _showQrCode(
+    BuildContext context,
+    String uid,
+    String name,
+  ) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      final media = MediaQuery.of(sheetContext);
+      final availableHeight = media.size.height - media.padding.top;
+      final qrSize = (availableHeight * 0.34).clamp(150.0, 210.0).toDouble();
 
-    final iso = DateTime.tryParse(text);
-    if (iso != null) {
-      return DateTime(iso.year, iso.month, iso.day);
-    }
-
-    final match = RegExp(
-      r'^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+'
-      r'(\d{1,2}),\s*(\d{4})$',
-      caseSensitive: false,
-    ).firstMatch(text);
-
-    if (match == null) return null;
-
-    const months = {
-      'jan': 1,
-      'feb': 2,
-      'mar': 3,
-      'apr': 4,
-      'may': 5,
-      'jun': 6,
-      'jul': 7,
-      'aug': 8,
-      'sep': 9,
-      'oct': 10,
-      'nov': 11,
-      'dec': 12,
-    };
-
-    final month = months[match.group(1)!.toLowerCase()];
-    final day = int.tryParse(match.group(2)!);
-    final year = int.tryParse(match.group(3)!);
-
-    if (month == null || day == null || year == null) return null;
-
-    final parsed = DateTime(year, month, day);
-    if (parsed.year != year || parsed.month != month || parsed.day != day) {
-      return null;
-    }
-
-    return parsed;
-  }
-
-  String _formatBirthDate(DateTime value) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[value.month - 1]} ${value.day}, ${value.year}';
-  }
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: availableHeight * 0.82),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(24, 2, 24, 20 + media.padding.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Scan to add this VonoTalky profile',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Theme.of(
+                        sheetContext,
+                      ).colorScheme.outlineVariant.withValues(alpha: .45),
+                    ),
+                  ),
+                  child: QrImageView(
+                    data: 'vonotalky://user/$uid',
+                    size: qrSize,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'VonoTalky ID',
+                style: TextStyle(
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              SelectableText(
+                uid,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
-class _TopProfile extends StatelessWidget {
-  const _TopProfile({
+class _ProfileHeader extends StatefulWidget {
+  const _ProfileHeader({
     required this.name,
     required this.username,
     required this.bio,
     required this.photoUrl,
   });
+
   final String name;
   final String username;
   final String bio;
   final String? photoUrl;
 
   @override
+  State<_ProfileHeader> createState() => _ProfileHeaderState();
+}
+
+class _ProfileHeaderState extends State<_ProfileHeader> {
+  bool expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [Color(0xFFF8DCEB), Color(0xFFEEDDF4), Color(0xFFDCCCF2)],
-          stops: [0, 0.48, 1],
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(26)),
-      ),
-      child: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              Container(
-                width: double.infinity,
-                height: 118,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF65439B), Color(0xFF8C63B8)],
-                  ),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(30),
-                    bottomRight: Radius.circular(30),
-                  ),
-                ),
-                child: const SafeArea(bottom: false, child: SizedBox.shrink()),
-              ),
-              Positioned(
-                bottom: -48,
-                child: Stack(
-                  children: [
-                    Container(
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x33000000),
-                            blurRadius: 12,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+    final primary = Theme.of(context).colorScheme.primary;
+    final bio = widget.bio.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 43,
+              backgroundColor: primary.withValues(alpha: .10),
+              backgroundImage: widget.photoUrl == null
+                  ? null
+                  : NetworkImage(widget.photoUrl!),
+              child: widget.photoUrl == null
+                  ? Text(
+                      widget.name.characters.first.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: primary,
                       ),
-                      child: CircleAvatar(
-                        radius: 52,
-                        backgroundColor: Colors.white,
-                        child: CircleAvatar(
-                          radius: 48,
-                          backgroundImage: photoUrl == null
-                              ? null
-                              : NetworkImage(photoUrl!),
-                          child: photoUrl == null
-                              ? Text(
-                                  name[0].toUpperCase(),
-                                  style: const TextStyle(fontSize: 34),
-                                )
-                              : null,
-                        ),
-                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
                     ),
-                    Positioned(
-                      right: 2,
-                      bottom: 5,
-                      child: Container(
-                        width: 19,
-                        height: 19,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF22C77A),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                        ),
+                  ),
+                  if (widget.username.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '@${widget.username}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 55),
+            ),
+          ],
+        ),
+        if (bio.isNotEmpty) ...[
+          const SizedBox(height: 18),
           Text(
-            name,
+            bio,
+            maxLines: expanded ? null : 3,
+            overflow: expanded ? null : TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 25,
-              height: 1,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF17131C),
+              fontSize: 14,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 5),
-          if (username.isNotEmpty) ...[
-            Text(
-              '@$username',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF65439B),
-              ),
-            ),
-            const SizedBox(height: 3),
-          ],
-          const Text(
-            'Offline | Last seen 5 mins ago',
-            style: TextStyle(fontSize: 12, color: Color(0xFF59525F)),
-          ),
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              bio,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF27202D)),
-            ),
-          ),
-          const SizedBox(height: 55),
-        ],
-      ),
-    );
-  }
-}
-
-class _Title extends StatelessWidget {
-  const _Title(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 2, bottom: 6),
-    child: Text(
-      text,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFF1B1620),
-      ),
-    ),
-  );
-}
-
-class _UserInfo extends StatelessWidget {
-  const _UserInfo({
-    required this.phone,
-    required this.email,
-    required this.birthDate,
-    required this.onBirthDateTap,
-  });
-
-  final String phone;
-  final String email;
-  final String birthDate;
-  final VoidCallback onBirthDateTap;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      _InfoLine(Icons.phone_rounded, phone),
-      const SizedBox(height: 9),
-      _InfoLine(Icons.email_rounded, email),
-      const SizedBox(height: 9),
-      _InfoLine(
-        Icons.cake_rounded,
-        birthDate.isEmpty ? 'Add birthday' : birthDate,
-        onTap: onBirthDateTap,
-        trailing: const Icon(
-          Icons.calendar_month_rounded,
-          size: 19,
-          color: Color(0xFF7653A5),
-        ),
-      ),
-    ],
-  );
-}
-
-class _InfoLine extends StatelessWidget {
-  const _InfoLine(this.icon, this.text, {this.onTap, this.trailing});
-
-  final IconData icon;
-  final String text;
-  final VoidCallback? onTap;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Padding(
-      padding: onTap == null
-          ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: const Color(0xFF7350A3)),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                color: onTap == null
-                    ? const Color(0xFF1B1620)
-                    : const Color(0xFF4F405D),
-                fontWeight: onTap == null ? FontWeight.w400 : FontWeight.w600,
-              ),
-            ),
-          ),
-          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-        ],
-      ),
-    );
-
-    if (onTap == null) return content;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: content,
-      ),
-    );
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(12),
-    elevation: 2,
-    shadowColor: const Color(0x22000000),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        height: 78,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: const Color(0xFF7653A5), size: 27),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11.5, height: 1.05),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _Activity extends StatelessWidget {
-  const _Activity({required this.service});
-  final ProfileService service;
-
-  @override
-  Widget build(BuildContext context) => StreamBuilder<int>(
-    stream: service.conversationCount(),
-    builder: (context, snapshot) => Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const Expanded(child: _Bars()),
-        const SizedBox(width: 13),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Messages Sent: ${(snapshot.data ?? 0) * 250}+ ',
-              style: const TextStyle(fontSize: 12),
-            ),
-            Text(
-              'Active Chats: ${snapshot.data ?? 0}',
-              style: const TextStyle(fontSize: 12),
-            ),
-            const SizedBox(height: 5),
-            FilledButton.icon(
-              onPressed: () {},
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF7653A5),
-                minimumSize: const Size(132, 32),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-              ),
-              icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
-              label: const Text('Add Contact', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
-
-class _Bars extends StatelessWidget {
-  const _Bars();
-  @override
-  Widget build(BuildContext context) {
-    const heights = [13.0, 23.0, 17.0, 32.0, 20.0, 38.0, 49.0];
-    return SizedBox(
-      height: 55,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: heights
-            .map(
-              (height) => Expanded(
-                child: Container(
-                  height: height,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: height > 35
-                        ? const Color(0xFF7653A5)
-                        : const Color(0xFFC5B2DF),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(2),
-                    ),
+          if (bio.length > 90)
+            InkWell(
+              onTap: () => setState(() => expanded = !expanded),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  expanded ? 'Less' : 'More',
+                  style: TextStyle(
+                    color: primary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
                   ),
                 ),
               ),
-            )
-            .toList(),
-      ),
+            ),
+        ],
+      ],
     );
   }
 }
 
-class _ContactQr extends StatelessWidget {
-  const _ContactQr({required this.uid, required this.name});
-  final String uid;
-  final String name;
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+  );
+}
+
+class _InfoGroup extends StatelessWidget {
+  const _InfoGroup({required this.children});
+
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(11),
-      boxShadow: const [BoxShadow(color: Color(0x12000000), blurRadius: 6)],
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: Theme.of(
+          context,
+        ).colorScheme.outlineVariant.withValues(alpha: .55),
+      ),
     ),
+    child: Column(children: children),
+  );
+}
+
+class _VisibilityInfoRow extends StatelessWidget {
+  const _VisibilityInfoRow({
+    required this.label,
+    required this.value,
+    required this.isPublic,
+    required this.onVisibilityTap,
+  });
+
+  final String label;
+  final String value;
+  final bool isPublic;
+  final VoidCallback onVisibilityTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
     child: Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'My Contact QR Code',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 3),
               Text(
-                name,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF6B6370)),
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
         ),
-        QrImageView(
-          data: 'vonotalky://user/$uid',
-          size: 65,
-          padding: EdgeInsets.zero,
+        IconButton(
+          tooltip: isPublic ? 'Public' : 'Only me',
+          onPressed: onVisibilityTap,
+          icon: Icon(
+            isPublic ? Icons.public_rounded : Icons.lock_outline_rounded,
+            size: 19,
+            color: isPublic
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     ),
   );
 }
 
-class _SignOutButton extends StatefulWidget {
-  const _SignOutButton();
+class _SoftDivider extends StatelessWidget {
+  const _SoftDivider();
 
   @override
-  State<_SignOutButton> createState() => _SignOutButtonState();
-}
-
-class _SignOutButtonState extends State<_SignOutButton> {
-  bool _isSigningOut = false;
-
-  Future<void> _confirmSignOut() async {
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(12),
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF0E8FC),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.logout_rounded,
-                  color: Color(0xFF7653A5),
-                ),
-              ),
-              const SizedBox(height: 13),
-              const Text(
-                'Sign out of VonoTalky?',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'You can sign back in at any time.',
-                style: TextStyle(color: Color(0xFF6B6370)),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(sheetContext, false),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(sheetContext, true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFB593E4),
-                      ),
-                      child: const Text('Sign Out'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-    setState(() => _isSigningOut = true);
-
-    try {
-      await PresenceService().setOnline(false);
-    } catch (_) {
-      // Signing out must still work when presence cannot be updated.
-    }
-
-    try {
-      await AuthService().signOut();
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isSigningOut = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not sign out. Please try again.')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
-    onPressed: _isSigningOut ? null : _confirmSignOut,
-    style: OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(48),
-      foregroundColor: const Color(0xFF7653A5),
-      side: const BorderSide(color: Color(0xFFD6C3EE)),
-      backgroundColor: const Color(0xFFF5EFFC),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    ),
-    icon: _isSigningOut
-        ? const SizedBox.square(
-            dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        : const Icon(Icons.logout_rounded),
-    label: Text(_isSigningOut ? 'Signing out...' : 'Sign Out'),
+  Widget build(BuildContext context) => Divider(
+    height: 1,
+    indent: 16,
+    endIndent: 16,
+    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .5),
   );
 }

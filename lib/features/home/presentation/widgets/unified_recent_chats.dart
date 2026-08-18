@@ -82,16 +82,18 @@ class UnifiedRecentChats extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
                       child: Material(
-                        color: const Color(0xFFF0E9F8),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: .10),
                         borderRadius: BorderRadius.circular(14),
                         child: ListTile(
                           dense: true,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.archive_outlined,
-                            color: Color(0xFF805BB3),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           title: const Text(
                             'Archived Chats',
@@ -656,10 +658,10 @@ class _ActionTile extends StatelessWidget {
       width: 42,
       height: 42,
       decoration: BoxDecoration(
-        color: const Color(0xFFF0E9F8),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: .10),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Icon(icon, color: const Color(0xFF6E489E)),
+      child: Icon(icon, color: Theme.of(context).colorScheme.primary),
     ),
     title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
     subtitle: Text(subtitle),
@@ -750,19 +752,19 @@ class _SwipeBackground extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       alignment: alignment,
       decoration: BoxDecoration(
-        color: const Color(0xFFE8DDF5),
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: .14),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: left
             ? [
-                Icon(icon, color: const Color(0xFF6E489E)),
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Color(0xFF5F3792),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -770,13 +772,13 @@ class _SwipeBackground extends StatelessWidget {
             : [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Color(0xFF5F3792),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(icon, color: const Color(0xFF6E489E)),
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
               ],
       ),
     );
@@ -826,15 +828,17 @@ class _GroupAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CircleAvatar(
     radius: 25,
-    backgroundColor: const Color(0xFFE5DAF5),
+    backgroundColor: Theme.of(
+      context,
+    ).colorScheme.primary.withValues(alpha: .12),
     backgroundImage: group.photoUrl == null
         ? null
         : NetworkImage(group.photoUrl!),
     child: group.photoUrl == null
         ? Text(
             group.name.isEmpty ? '?' : group.name[0].toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFF65439B),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
               fontWeight: FontWeight.w800,
             ),
           )
@@ -869,7 +873,9 @@ class _ThreadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: pinned ? const Color(0xFFF6F0FB) : Colors.transparent,
+    color: pinned
+        ? Theme.of(context).colorScheme.primary.withValues(alpha: .06)
+        : Colors.transparent,
     borderRadius: BorderRadius.circular(16),
     child: ListTile(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -878,10 +884,10 @@ class _ThreadTile extends StatelessWidget {
       title: Row(
         children: [
           if (group) ...[
-            const Icon(
+            Icon(
               Icons.groups_rounded,
               size: 14,
-              color: Color(0xFF805BB3),
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 5),
           ],
@@ -895,10 +901,10 @@ class _ThreadTile extends StatelessWidget {
           ),
           if (pinned) ...[
             const SizedBox(width: 6),
-            const Icon(
+            Icon(
               Icons.push_pin_rounded,
               size: 15,
-              color: Color(0xFF805BB3),
+              color: Theme.of(context).colorScheme.primary,
             ),
           ],
         ],
@@ -907,17 +913,17 @@ class _ThreadTile extends StatelessWidget {
           ? Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(
+                  TextSpan(
                     text: 'Draft: ',
                     style: TextStyle(
-                      color: Color(0xFF805BB3),
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   TextSpan(
                     text: subtitle.replaceAll('\n', ' '),
-                    style: const TextStyle(
-                      color: Color(0xFF805BB3),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -940,7 +946,7 @@ class _ThreadTile extends StatelessWidget {
               margin: const EdgeInsets.only(top: 5),
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFF805BB3),
+                color: Theme.of(context).colorScheme.primary,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -971,7 +977,9 @@ class _UserAvatar extends StatelessWidget {
     children: [
       CircleAvatar(
         radius: 25,
-        backgroundColor: const Color(0xFFE5DAF5),
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.primary.withValues(alpha: .12),
         backgroundImage: user.photoUrl == null
             ? null
             : NetworkImage(user.photoUrl!),
@@ -1078,7 +1086,7 @@ class _EmptyState extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 52, color: const Color(0xFF805BB3)),
+        Icon(icon, size: 52, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 12),
         Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
       ],
