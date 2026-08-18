@@ -4,6 +4,175 @@ All notable changes to VonoTalky are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Phase 104.8.4: repaired the malformed AppBar online-status Dart collection-if that caused the 254-line analyzer/editor error cascade.
+- Preserved the existing `Show pet / Hide pet` item in the chat `⋮` menu.
+- Preserved the removal of the floating top-right paw button.
+- Preserved Mochi's 92 px visual size, 108 px drag hitbox, root Overlay architecture, position persistence, and visibility persistence.
+- Preserved the safely braced `pet == null` guard.
+
+
+### Changed
+
+- Phase 104.8.3 removes the floating top-right paw button that appeared while Mochi was hidden.
+- Added `Show pet / Hide pet` to the existing chat `⋮` more-options menu.
+- Hidden Mochi now leaves no floating control over the AppBar or conversation UI.
+- Preserved the 92 px Mochi visual size, 108 px drag hitbox, root Overlay architecture, saved position, and visibility persistence.
+- Fixed the remaining `pet == null` curly-braces lint.
+
+
+### Fixed
+
+- Phase 104.8.2 repairs the malformed Dart collection-if introduced by the Phase 104.8.1 lint auto-fix.
+- Restored the online-status `Positioned` widget to valid collection-if syntax inside the AppBar avatar `Stack`.
+- Fixes the cascade of hundreds of editor/analyzer syntax errors caused by that single misplaced brace.
+- Mochi size, 108 px drag hitbox, global Overlay architecture, animations, and saved position are unchanged.
+
+
+### Fixed
+
+- Phase 104.8.1 reduces Mochi's visible size from 118 px to 92 px for a lighter floating-pet presence.
+- Reduced the invisible drag hit area from 176 px to 108 px so the Overlay no longer blocks a large invisible portion of the chat.
+- Reduced the minimum on-screen grip from 28 px to 20 px while preserving edge/partially-offscreen placement.
+- Cleared the remaining `curly_braces_in_flow_control_structures` lint in the direct chat page.
+- Preserved the root `OverlayEntry` architecture and normalized per-contact position persistence.
+
+
+### Fixed
+
+- Phase 104.8 moves Mochi out of the chat page `Stack` and into a root `OverlayEntry`.
+- Mochi drag gestures now live above the chat `ListView`, preventing Edge mouse dragging and mobile touch dragging from fighting conversation scrolling.
+- Drag updates rebuild only the floating overlay instead of rebuilding the full chat room for every pointer movement.
+- Preserved the Phase 104.7 native vector Mochi appearance, full tail, animation states, 176 px invisible hit target, hide/show state, and normalized saved position.
+- The overlay is installed after the chat route mounts and is removed safely when leaving the conversation.
+
+
+### Fixed
+
+- Phase 104.7.2 replaces the corrupted Phase 104.7.1 `pet_actor.dart` with a clean full-file implementation.
+- Fixed the malformed `State<PetActorclass ...` source corruption and the resulting analyzer cascade.
+- Mochi keeps the Phase 104.7 native vector appearance and full tail.
+- Dragging now uses a valid `GestureDetector` pan recognizer with `DragStartBehavior.down` and the existing large invisible hit area.
+- No chat, Firebase, notification, or pet persistence logic is changed.
+
+
+### Changed
+
+- Phase 104.7 removes the unreliable AI-cropped Mochi sprite assets entirely.
+- Mochi is now rendered as a native vector-style Flutter `CustomPainter`, so there is no rectangular background to cut out and the full fluffy tail is always preserved.
+- Increased the invisible drag target to 176 px while the visible pet remains compact.
+- Pointer-level dragging remains immediate and independent from the visible pet silhouette.
+- Idle breathing, tail sway, blink, happy/touched reaction, drag, land and sleep states are rendered procedurally.
+- Removed the obsolete `assets/pets/mochi/` registration and files.
+
+
+### Fixed
+
+- Phase 104.6.2 replaces the previous over-cropped Mochi frames with a new full-tail sprite set derived from the cleaner approved visual source.
+- Increased the invisible drag hit area from the visible pet size to 164 px while keeping the on-screen Mochi around 112 px.
+- Replaced GestureDetector pan handling with pointer-level `Listener` tracking so dragging starts immediately and no longer competes heavily with the chat ListView scroll gesture.
+- A movement threshold separates tap interaction from dragging, so tapping still opens pet interaction while small finger movement does not accidentally trigger the menu.
+- Full-screen/partially-offscreen placement and normalized saved position are preserved.
+
+
+### Fixed
+
+- Phase 104.6.1 rebuilt all 28 Mochi animation frames with a true transparent canvas so the visible square/card edge is removed.
+- Mochi can now be dragged across the full chat overlay, including all four edges and partly offscreen like a floating control.
+- Removed the previous 10 px edge margin and 106 px bottom reserve.
+- Only 24 px of Mochi is forced to remain reachable so it cannot be permanently lost offscreen.
+- Existing animation states, tap interaction, hide/show behavior, and normalized position persistence are preserved.
+
+
+### Changed
+
+- Phase 104.6 replaces the Phase 104.5 single-image floating pet with a multi-state Mochi 2D actor system.
+- Added 28 transparent animation frames across idle, blink, happy, touched, drag, land, and sleep states.
+- Added a dedicated `PetActor` state machine with timed frame playback and randomized idle behavior.
+- Dragging switches Mochi into a drag state immediately, follows the finger/pointer directly, and plays a landing animation on release.
+- Tapping Mochi plays a touched reaction and opens a compact interaction menu instead of placing controls over the pet body.
+- Hide/show and normalized per-contact position persistence from Phase 104.5 are preserved.
+- Removed the old `mochi_floating.png` single-image asset path.
+
+
+### Changed
+
+- Phase 104.5: replaced the placeholder circular fire icon with the actual Mochi 2D pet appearance from the approved visual direction.
+- Floating Mochi now has no card or circular background and sits directly over the conversation.
+- Reworked dragging to immediate pan tracking so the pet follows the pointer/finger without a long-press delay.
+- Added a subtle idle floating animation that pauses while dragging.
+- Preserved per-contact position, hide/show state, pet detail access, and care notification badge.
+
+
+### Fixed
+
+- Phase 104.4.1: restored `_PetInviteBanner`, `_MessageDetailRow`, and `_SelectionToolbar` that were accidentally removed while replacing the old fixed pet card.
+- Fixed 7 analyzer errors in `real_chat_room_page.dart`.
+- Floating pet behavior from Phase 104.4 is unchanged.
+
+
+### Fixed
+
+- Phase 104.4: removed the large shared-pet card from the top of direct chats so it no longer consumes conversation space.
+- Shared pets now appear as a compact floating pet overlay that can be dragged around the chat screen.
+- Added hide/show control for the floating pet without changing or deleting pet data.
+- Floating pet position and visibility are persisted per contact in the existing user-owned `contactPreferences` document.
+- Tapping the floating pet still opens pet details; long-press keeps quick-care access.
+- The overlay reserves space above the message composer and clamps dragging to safe chat bounds.
+
+
+### Fixed
+
+- Phase 104.3: added the missing Cloud Function trigger for `groups/{groupId}/messages/{messageId}` so group messages can generate FCM notifications.
+- Group notifications are fanned out to every current group member except the sender.
+- Group text, photo, file and voice notifications now use appropriate notification previews.
+- Group chat now marks `group_<groupId>` as the active conversation so the device currently viewing that group is not needlessly notified.
+- Added structured logs for missing groups, invalid senders and partial group-notification failures.
+
+
+### Fixed
+
+- Phase 104.2: aligned the Recent Chats and Contacts top headers to the same vertical geometry to remove the visible tab-switch jump.
+- Standardized the VonoTalky title row to the same top padding on both tabs.
+- Standardized the search row bottom padding so the search field stays at the same Y position.
+- Kept the existing page-specific actions and search behavior unchanged.
+
+
+### Fixed
+
+- Phase 104.1: vertically centered the microphone/keyboard toggle, text field, emoji button, attachment button and send button in both direct and group chat composers.
+- Fixed the single-line composer state where action icons appeared lower than the message text.
+- Kept multiline text growth independent from the icon row alignment.
+
+
+### Fixed
+
+- Reworked direct-message and group-message composers to use the same WeChat-style text/voice switching flow.
+- Added a dedicated left-side voice/keyboard toggle instead of replacing the send button with a microphone when the text field is empty.
+- Added hold-to-talk voice input with release-to-send and slide-up-to-cancel behavior.
+- Kept the keyboard focused after sending a text message so consecutive messages can be typed without reopening the keyboard.
+- Increased active send/voice control contrast so enabled controls no longer look disabled.
+- Unified the direct-chat and group-chat composer interaction model.
+
+### Added
+
+- Added private per-contact nicknames in Contact Detail.
+- Added private per-contact notes with a multiline editor.
+- Added clear/save actions for contact nickname and note fields.
+- Stored contact notes inside the existing user-owned `contactPreferences` documents.
+
+### Changed
+
+- Contact Detail now groups personal contact metadata above pin and mute controls.
+- Private text preferences are removed from Firestore when cleared instead of storing empty strings.
+
+### Security
+
+- Contact nicknames and private notes remain readable and writable only by the signed-in owner through the existing `contactPreferences` Firestore rules.
+- No Firestore Rules changes.
+- No Firebase Functions deployment required.
+
 ### Added
 
 - Added global System / Light / Dark appearance modes.
@@ -25,7 +194,6 @@ All notable changes to VonoTalky are documented in this file.
 - Added `shared_preferences` for device-local appearance persistence.
 - No Firestore Rules changes.
 - No Firebase Functions deployment required.
-
 ---
 
 ## \[0.4.0\] - 2026-08-17

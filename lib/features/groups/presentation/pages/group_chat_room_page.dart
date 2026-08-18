@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-
+import '../../../pet/data/services/pet_notification_service.dart';
 import '../../../chat/data/services/chat_file_service.dart';
 import '../../../chat/data/models/message_reply.dart';
 import '../../../chat/data/services/chat_media_service.dart';
@@ -33,6 +33,7 @@ class GroupChatRoomPage extends StatefulWidget {
 
 class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   final controller = TextEditingController();
+  final messageFocusNode = FocusNode();
   final messageScrollController = ScrollController();
   final service = GroupService();
   final recentChatService = GroupRecentChatService();
@@ -40,10 +41,13 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   final mediaService = ChatMediaService();
   final fileService = ChatFileService();
   final voiceService = ChatVoiceService();
+  final notificationService = PetNotificationService();
   Timer? draftTimer;
   bool sending = false;
   bool uploading = false;
   bool recording = false;
+  bool voiceInputMode = false;
+  bool voiceCancelArmed = false;
   final voiceWatch = Stopwatch();
   Timer? voiceTimer;
   int voiceSeconds = 0;
@@ -55,6 +59,7 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   void initState() {
     super.initState();
     service.markRead(widget.group.id);
+    notificationService.setActiveConversation('group_${widget.group.id}');
     _restoreDraft();
   }
 
@@ -63,6 +68,8 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
     draftTimer?.cancel();
     voiceTimer?.cancel();
     voiceService.dispose();
+    notificationService.clearActiveConversation('group_${widget.group.id}');
+    messageFocusNode.dispose();
     controller.dispose();
     messageScrollController.dispose();
     super.dispose();
@@ -427,17 +434,75 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                             onSend: _sendRecording,
                           )
                         : Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               IconButton(
-                                onPressed: _toggleEmojiPicker,
-                                icon: const Icon(
-                                  Icons.sentiment_satisfied_alt_outlined,
+                                onPressed: uploading || sending
+                                    ? null
+                                    : _toggleVoiceInputMode,
+                                tooltip: voiceInputMode
+                                    ? 'Switch to keyboard'
+                                    : 'Switch to voice',
+                                style: IconButton.styleFrom(
+                                  foregroundColor: const Color(0xFF5F3F86),
+                                ),
+                                icon: Icon(
+                                  voiceInputMode
+                                      ? Icons.keyboard_alt_outlined
+                                      : Icons.mic_none_rounded,
+                                  size: 24,
+                                ),
+                              ),
+                              if (voiceInputMode)
+                                _voiceHoldButton()
+                              else
+                                Expanded(
+                                  child: TextField(
+                                    controller: controller,
+                                    focusNode: messageFocusNode,
+                                    textAlignVertical: TextAlignVertical.center,
+                                    minLines: 1,
+                                    maxLines: 4,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Message the group...',
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      if (showEmojiPicker) {
+                                        setState(() => showEmojiPicker = false);
+                                      }
+                                    },
+                                    onChanged: (_) {
+                                      _scheduleDraftSave();
+                                      setState(() {});
+                                    },
+                                    onSubmitted: (_) => _sendText(),
+                                  ),
+                                ),
+                              IconButton(
+                                onPressed: voiceInputMode
+                                    ? null
+                                    : _toggleEmojiPicker,
+                                style: IconButton.styleFrom(
+                                  foregroundColor: const Color(0xFF5F3F86),
+                                ),
+                                icon: Icon(
+                                  showEmojiPicker
+                                      ? Icons.sentiment_satisfied_alt_rounded
+                                      : Icons.sentiment_satisfied_alt_outlined,
                                 ),
                               ),
                               IconButton(
                                 onPressed: uploading
                                     ? null
                                     : _showAttachmentMenu,
+                                style: IconButton.styleFrom(
+                                  foregroundColor: const Color(0xFF5F3F86),
+                                ),
                                 icon: uploading
                                     ? const SizedBox(
                                         width: 18,
@@ -446,50 +511,39 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Icon(Icons.attach_file_rounded),
+                                    : const Icon(
+                                        Icons.add_circle_outline_rounded,
+                                        size: 25,
+                                      ),
                               ),
-                              Expanded(
-                                child: TextField(
-                                  controller: controller,
-                                  textAlignVertical: TextAlignVertical.center,
-                                  minLines: 1,
-                                  maxLines: 4,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Message the group...',
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: 10,
+                              if (!voiceInputMode &&
+                                  controller.text.trim().isNotEmpty)
+                                IconButton.filled(
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: const Color(0xFF7653A5),
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor: const Color(
+                                      0xFFD9CDE8,
                                     ),
+                                    disabledForegroundColor: Colors.white70,
                                   ),
-                                  onTap: () {
-                                    if (showEmojiPicker) {
-                                      setState(() => showEmojiPicker = false);
-                                    }
-                                  },
-                                  onChanged: (_) {
-                                    _scheduleDraftSave();
-                                    setState(() {});
-                                  },
-                                  onSubmitted: (_) => _sendText(),
+                                  onPressed: uploading || sending
+                                      ? null
+                                      : _sendText,
+                                  icon: sending
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.send_rounded,
+                                          size: 19,
+                                        ),
                                 ),
-                              ),
-                              IconButton.filled(
-                                style: IconButton.styleFrom(
-                                  backgroundColor: const Color(0xFFB49ADF),
-                                ),
-                                onPressed: uploading || sending
-                                    ? null
-                                    : controller.text.trim().isNotEmpty
-                                    ? _sendText
-                                    : _startRecording,
-                                icon: Icon(
-                                  controller.text.trim().isNotEmpty
-                                      ? Icons.send_rounded
-                                      : Icons.mic_rounded,
-                                  size: 19,
-                                ),
-                              ),
                             ],
                           ),
                   ),
@@ -537,6 +591,9 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   }
 
   void _toggleEmojiPicker() {
+    if (voiceInputMode) {
+      setState(() => voiceInputMode = false);
+    }
     if (!showEmojiPicker) FocusScope.of(context).unfocus();
     setState(() => showEmojiPicker = !showEmojiPicker);
   }
@@ -562,6 +619,7 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
     if (text.isEmpty || sending) return;
     final reply = replyingTo;
     controller.clear();
+    messageFocusNode.requestFocus();
     setState(() {
       showEmojiPicker = false;
       sending = true;
@@ -571,6 +629,7 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
       await service.sendText(widget.group, text, reply: reply);
       draftTimer?.cancel();
       await recentChatService.setDraft(widget.group.id, '');
+      if (mounted && !voiceInputMode) messageFocusNode.requestFocus();
     } catch (_) {
       controller.text = text;
       replyingTo = reply;
@@ -656,6 +715,95 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
       if (mounted) setState(() => uploading = false);
     }
   }
+
+  void _toggleVoiceInputMode() {
+    if (recording || uploading || sending) return;
+    if (voiceInputMode) {
+      setState(() {
+        voiceInputMode = false;
+        voiceCancelArmed = false;
+        showEmojiPicker = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        messageFocusNode.requestFocus();
+      });
+    } else {
+      messageFocusNode.unfocus();
+      setState(() {
+        voiceInputMode = true;
+        voiceCancelArmed = false;
+        showEmojiPicker = false;
+      });
+    }
+  }
+
+  Future<void> _beginHoldToTalk() async {
+    if (recording || uploading || sending) return;
+    await HapticFeedback.mediumImpact();
+    await _startRecording();
+  }
+
+  void _updateHoldToTalk(LongPressMoveUpdateDetails details) {
+    if (!recording) return;
+    final shouldCancel = details.offsetFromOrigin.dy < -60;
+    if (shouldCancel != voiceCancelArmed && mounted) {
+      setState(() => voiceCancelArmed = shouldCancel);
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  Future<void> _finishHoldToTalk() async {
+    if (!recording) return;
+    if (voiceCancelArmed) {
+      await _cancelRecording();
+      if (mounted) _notice('Voice message cancelled');
+    } else {
+      await _sendRecording();
+    }
+    if (mounted) setState(() => voiceCancelArmed = false);
+  }
+
+  Widget _voiceHoldButton() => Expanded(
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPressStart: (_) => _beginHoldToTalk(),
+      onLongPressMoveUpdate: _updateHoldToTalk,
+      onLongPressEnd: (_) => _finishHoldToTalk(),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: voiceCancelArmed
+              ? const Color(0xFFF7D9DE)
+              : recording
+              ? const Color(0xFFE5D8F5)
+              : const Color(0xFFF7F4FA),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: voiceCancelArmed
+                ? const Color(0xFFC85B70)
+                : const Color(0xFFD8CBE8),
+          ),
+        ),
+        child: Text(
+          voiceCancelArmed
+              ? 'Release to cancel'
+              : recording
+              ? 'Release to send · Slide up to cancel'
+              : 'Hold to talk',
+          style: TextStyle(
+            color: voiceCancelArmed
+                ? const Color(0xFFB33F58)
+                : const Color(0xFF4E3B63),
+            fontWeight: FontWeight.w700,
+            fontSize: recording ? 12 : 14,
+          ),
+        ),
+      ),
+    ),
+  );
 
   Future<void> _startRecording() async {
     if (!await voiceService.start() || !mounted) {

@@ -61,32 +61,80 @@ class ContactDetailPage extends StatelessWidget {
                     stream: _service.preferences(current.uid),
                     builder: (context, snapshot) {
                       final preferences = snapshot.data ?? {};
-                      return _Card(
+                      final nickname = preferences['nickname'] as String? ?? '';
+                      final privateNote =
+                          preferences['privateNote'] as String? ?? '';
+
+                      return Column(
                         children: [
-                          SwitchListTile(
-                            secondary: const _SmallIcon(Icons.push_pin_rounded),
-                            title: const Text('Pin Conversation'),
-                            value: preferences['pinned'] as bool? ?? false,
-                            activeTrackColor: const Color(0xFFB593E4),
-                            onChanged: (value) => _service.setPreference(
-                              current.uid,
-                              'pinned',
-                              value,
-                            ),
+                          _Card(
+                            children: [
+                              _EditablePreferenceTile(
+                                icon: Icons.badge_outlined,
+                                title: 'Nickname',
+                                value: nickname,
+                                emptyText: 'Add a private nickname',
+                                onTap: () => _editTextPreference(
+                                  context,
+                                  current.uid,
+                                  key: 'nickname',
+                                  title: 'Contact nickname',
+                                  hintText: current.name,
+                                  initialValue: nickname,
+                                  maxLength: 40,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const _Divider(),
+                              _EditablePreferenceTile(
+                                icon: Icons.sticky_note_2_outlined,
+                                title: 'Private note',
+                                value: privateNote,
+                                emptyText: 'Add notes only you can see',
+                                onTap: () => _editTextPreference(
+                                  context,
+                                  current.uid,
+                                  key: 'privateNote',
+                                  title: 'Private note',
+                                  hintText: 'e.g. Met at school, likes coffee…',
+                                  initialValue: privateNote,
+                                  maxLength: 240,
+                                  maxLines: 5,
+                                ),
+                              ),
+                            ],
                           ),
-                          const _Divider(),
-                          SwitchListTile(
-                            secondary: const _SmallIcon(
-                              Icons.notifications_off_rounded,
-                            ),
-                            title: const Text('Mute Notifications'),
-                            value: preferences['muted'] as bool? ?? false,
-                            activeTrackColor: const Color(0xFFB593E4),
-                            onChanged: (value) => _service.setPreference(
-                              current.uid,
-                              'muted',
-                              value,
-                            ),
+                          const SizedBox(height: 16),
+                          _Card(
+                            children: [
+                              SwitchListTile(
+                                secondary: const _SmallIcon(
+                                  Icons.push_pin_rounded,
+                                ),
+                                title: const Text('Pin Conversation'),
+                                value: preferences['pinned'] as bool? ?? false,
+                                activeTrackColor: const Color(0xFFB593E4),
+                                onChanged: (value) => _service.setPreference(
+                                  current.uid,
+                                  'pinned',
+                                  value,
+                                ),
+                              ),
+                              const _Divider(),
+                              SwitchListTile(
+                                secondary: const _SmallIcon(
+                                  Icons.notifications_off_rounded,
+                                ),
+                                title: const Text('Mute Notifications'),
+                                value: preferences['muted'] as bool? ?? false,
+                                activeTrackColor: const Color(0xFFB593E4),
+                                onChanged: (value) => _service.setPreference(
+                                  current.uid,
+                                  'muted',
+                                  value,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       );
@@ -122,6 +170,114 @@ class ContactDetailPage extends StatelessWidget {
       );
     },
   );
+
+  Future<void> _editTextPreference(
+    BuildContext context,
+    String uid, {
+    required String key,
+    required String title,
+    required String hintText,
+    required String initialValue,
+    required int maxLength,
+    required int maxLines,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+    controller.selection = TextSelection.collapsed(
+      offset: controller.text.length,
+    );
+
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'This is private and is never shown to the contact.',
+                style: TextStyle(color: Color(0xFF766F7C), fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                maxLength: maxLength,
+                minLines: maxLines == 1 ? 1 : 3,
+                maxLines: maxLines,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  filled: true,
+                  fillColor: const Color(0xFFF7F4FA),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  if (initialValue.trim().isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () => Navigator.pop(sheetContext, ''),
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      label: const Text('Clear'),
+                    ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () =>
+                        Navigator.pop(sheetContext, controller.text),
+                    child: const Text('Save'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    controller.dispose();
+    if (value == null) return;
+
+    try {
+      await _service.setTextPreference(uid, key, value);
+      if (context.mounted) {
+        _notice(
+          context,
+          value.trim().isEmpty ? '$title cleared' : '$title saved',
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _notice(context, 'Could not save $title.');
+      }
+    }
+  }
 
   Future<void> _remove(BuildContext context, ChatUser current) async {
     final confirmed = await _confirm(
@@ -191,7 +347,9 @@ class ContactDetailPage extends StatelessWidget {
         ),
       ),
     );
+
     if (reason == null) return;
+
     try {
       await _service.report(current, reason);
       if (context.mounted) _notice(context, 'Report submitted. Thank you.');
@@ -235,6 +393,7 @@ class ContactDetailPage extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   const _Header({required this.user});
+
   final ChatUser user;
 
   @override
@@ -318,6 +477,7 @@ class _MainAction extends StatelessWidget {
     required this.label,
     required this.onTap,
   });
+
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -348,6 +508,7 @@ class _MainAction extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.user});
+
   final ChatUser user;
 
   @override
@@ -362,9 +523,46 @@ class _InfoCard extends StatelessWidget {
   );
 }
 
+class _EditablePreferenceTile extends StatelessWidget {
+  const _EditablePreferenceTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.emptyText,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String emptyText;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value.trim().isNotEmpty;
+    return ListTile(
+      onTap: onTap,
+      leading: _SmallIcon(icon),
+      title: Text(title),
+      subtitle: Text(
+        hasValue ? value : emptyText,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: hasValue ? const Color(0xFF5F5866) : const Color(0xFF918997),
+        ),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
+    );
+  }
+}
+
 class _Card extends StatelessWidget {
   const _Card({required this.children});
+
   final List<Widget> children;
+
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
@@ -377,8 +575,10 @@ class _Card extends StatelessWidget {
 
 class _InfoTile extends StatelessWidget {
   const _InfoTile({required this.icon, required this.text});
+
   final IconData icon;
   final String text;
+
   @override
   Widget build(BuildContext context) =>
       ListTile(leading: _SmallIcon(icon), title: Text(text));
@@ -390,9 +590,11 @@ class _DangerTile extends StatelessWidget {
     required this.title,
     required this.onTap,
   });
+
   final IconData icon;
   final String title;
   final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) => ListTile(
     onTap: onTap,
@@ -410,7 +612,9 @@ class _DangerTile extends StatelessWidget {
 
 class _SmallIcon extends StatelessWidget {
   const _SmallIcon(this.icon);
+
   final IconData icon;
+
   @override
   Widget build(BuildContext context) => Container(
     width: 38,
@@ -425,6 +629,7 @@ class _SmallIcon extends StatelessWidget {
 
 class _Divider extends StatelessWidget {
   const _Divider();
+
   @override
   Widget build(BuildContext context) =>
       const Divider(height: 1, indent: 66, color: Color(0xFFEDE8F0));

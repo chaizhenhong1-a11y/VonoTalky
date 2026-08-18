@@ -44,6 +44,16 @@ class ContactDetailService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+  Future<void> setTextPreference(String uid, String key, String value) => _db
+      .collection('users')
+      .doc(_myId)
+      .collection('contactPreferences')
+      .doc(uid)
+      .set({
+        key: value.trim().isEmpty ? FieldValue.delete() : value.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
   Future<void> setDraft(String uid, String value) => _db
       .collection('users')
       .doc(_myId)

@@ -29,6 +29,7 @@ import '../../../pet/data/models/shared_pet.dart';
 import '../../../pet/data/services/shared_pet_service.dart';
 import '../../../pet/data/services/pet_notification_service.dart';
 import '../../../pet/presentation/pages/shared_pet_detail_page.dart';
+import '../../../pet/presentation/widgets/floating_pet_actor.dart';
 import 'advanced_chat_search_page.dart';
 import 'forward_message_page.dart';
 import 'media_viewer_page.dart';
@@ -74,6 +75,8 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   bool sending = false;
   bool uploading = false;
   bool recording = false;
+  bool voiceInputMode = false;
+  bool voiceCancelArmed = false;
   final voiceWatch = Stopwatch();
   Timer? voiceTimer;
   int voiceSeconds = 0;
@@ -85,6 +88,9 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   int newerMessagesBelow = 0;
   final Set<String> heartAnimations = {};
   String chatBackground = 'blue';
+  Offset floatingPetAnchor = const Offset(0.82, 0.18);
+  bool floatingPetVisible = true;
+  OverlayEntry? floatingPetOverlayEntry;
   String? highlightedMessageId;
 
   @override
@@ -97,6 +103,10 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     controller.addListener(_typingChanged);
     messageScrollController.addListener(_handleMessageScroll);
     _restoreDraft();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _installFloatingPetOverlay();
+    });
   }
 
   Future<void> _restoreDraft() async {
@@ -107,8 +117,22 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       final draft = preferences['draft'] as String? ?? '';
       final savedBackground =
           preferences['chatBackground'] as String? ?? 'blue';
+      final savedPetX = (preferences['floatingPetX'] as num?)?.toDouble();
+      final savedPetY = (preferences['floatingPetY'] as num?)?.toDouble();
+      final savedPetVisible =
+          preferences['floatingPetVisible'] as bool? ?? true;
       if (!mounted) return;
-      setState(() => chatBackground = savedBackground);
+      setState(() {
+        chatBackground = savedBackground;
+        floatingPetVisible = savedPetVisible;
+        if (savedPetX != null && savedPetY != null) {
+          floatingPetAnchor = Offset(
+            savedPetX.clamp(0.0, 1.0),
+            savedPetY.clamp(0.0, 1.0),
+          );
+        }
+      });
+      floatingPetOverlayEntry?.markNeedsBuild();
       if (draft.isEmpty || controller.text.isNotEmpty) return;
       controller.value = TextEditingValue(
         text: draft,
@@ -340,6 +364,8 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
 
   @override
   void dispose() {
+    floatingPetOverlayEntry?.remove();
+    floatingPetOverlayEntry = null;
     typingTimer?.cancel();
     draftTimer?.cancel();
     contactDetailService.setDraft(widget.user.uid, controller.text);
@@ -368,6 +394,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     if (text.trim().isEmpty || sending) return;
     final reply = replyingTo;
     controller.clear();
+    messageFocusNode.requestFocus();
     setState(() {
       sending = true;
       replyingTo = null;
@@ -461,6 +488,95 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       if (mounted) setState(() => uploading = false);
     }
   }
+
+  void _toggleVoiceInputMode() {
+    if (recording || uploading || sending) return;
+    if (voiceInputMode) {
+      setState(() {
+        voiceInputMode = false;
+        voiceCancelArmed = false;
+        showEmojiPicker = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        messageFocusNode.requestFocus();
+      });
+    } else {
+      messageFocusNode.unfocus();
+      setState(() {
+        voiceInputMode = true;
+        voiceCancelArmed = false;
+        showEmojiPicker = false;
+      });
+    }
+  }
+
+  Future<void> _beginHoldToTalk() async {
+    if (recording || uploading || sending) return;
+    await HapticFeedback.mediumImpact();
+    await _startRecording();
+  }
+
+  void _updateHoldToTalk(LongPressMoveUpdateDetails details) {
+    if (!recording) return;
+    final shouldCancel = details.offsetFromOrigin.dy < -60;
+    if (shouldCancel != voiceCancelArmed && mounted) {
+      setState(() => voiceCancelArmed = shouldCancel);
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  Future<void> _finishHoldToTalk() async {
+    if (!recording) return;
+    if (voiceCancelArmed) {
+      await _cancelRecording();
+      if (mounted) _notice('Voice message cancelled');
+    } else {
+      await _sendRecording();
+    }
+    if (mounted) setState(() => voiceCancelArmed = false);
+  }
+
+  Widget _voiceHoldButton() => Expanded(
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPressStart: (_) => _beginHoldToTalk(),
+      onLongPressMoveUpdate: _updateHoldToTalk,
+      onLongPressEnd: (_) => _finishHoldToTalk(),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: voiceCancelArmed
+              ? const Color(0xFFF7D9DE)
+              : recording
+              ? const Color(0xFFE5D8F5)
+              : const Color(0xFFF7F4FA),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: voiceCancelArmed
+                ? const Color(0xFFC85B70)
+                : const Color(0xFFD8CBE8),
+          ),
+        ),
+        child: Text(
+          voiceCancelArmed
+              ? 'Release to cancel'
+              : recording
+              ? 'Release to send · Slide up to cancel'
+              : 'Hold to talk',
+          style: TextStyle(
+            color: voiceCancelArmed
+                ? const Color(0xFFB33F58)
+                : const Color(0xFF4E3B63),
+            fontWeight: FontWeight.w700,
+            fontSize: recording ? 12 : 14,
+          ),
+        ),
+      ),
+    ),
+  );
 
   Future<void> _startRecording() async {
     final allowed = await voiceService.start();
@@ -743,28 +859,6 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
           color: _chatBackgroundColor,
           child: Column(
             children: [
-              StreamBuilder<SharedPet?>(
-                stream: sharedPetService.watchSharedPetWith(widget.user.uid),
-                builder: (context, snapshot) {
-                  final pet = snapshot.data;
-                  if (pet == null) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return _SharedPetChatShortcut(
-                    pet: pet,
-                    pendingCareStream: sharedPetService
-                        .watchIncomingCareRequestCount(pet.id),
-                    onQuickCare: () => _showPetQuickCare(pet),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => SharedPetDetailPage(petId: pet.id),
-                      ),
-                    ),
-                  );
-                },
-              ),
               StreamBuilder<PetInvite?>(
                 stream: petInviteService.watchPendingInviteWith(
                   widget.user.uid,
@@ -1607,34 +1701,141 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                                   onSend: _sendRecording,
                                 )
                               : Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     IconButton(
                                       visualDensity: VisualDensity.compact,
-                                      onPressed: _toggleEmojiPicker,
+                                      onPressed: uploading || sending
+                                          ? null
+                                          : _toggleVoiceInputMode,
+                                      tooltip: voiceInputMode
+                                          ? 'Switch to keyboard'
+                                          : 'Switch to voice',
+                                      style: IconButton.styleFrom(
+                                        foregroundColor: const Color(
+                                          0xFF5F3F86,
+                                        ),
+                                      ),
+                                      icon: Icon(
+                                        voiceInputMode
+                                            ? Icons.keyboard_alt_outlined
+                                            : Icons.mic_none_rounded,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    if (voiceInputMode)
+                                      _voiceHoldButton()
+                                    else
+                                      Expanded(
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            minHeight: 42,
+                                            maxHeight: 104,
+                                          ),
+                                          child: TextField(
+                                            controller: controller,
+                                            focusNode: messageFocusNode,
+                                            textAlignVertical:
+                                                TextAlignVertical.center,
+                                            onTap: () {
+                                              if (showEmojiPicker) {
+                                                setState(
+                                                  () => showEmojiPicker = false,
+                                                );
+                                              }
+                                            },
+                                            maxLines: 4,
+                                            minLines: 1,
+                                            maxLength: 2000,
+                                            buildCounter:
+                                                (
+                                                  context, {
+                                                  required currentLength,
+                                                  required isFocused,
+                                                  required maxLength,
+                                                }) {
+                                                  if (currentLength < 1800) {
+                                                    return const SizedBox.shrink();
+                                                  }
+                                                  final nearlyFull =
+                                                      currentLength >= 1950;
+                                                  return Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          right: 4,
+                                                          top: 2,
+                                                        ),
+                                                    child: Text(
+                                                      '${2000 - currentLength} characters left',
+                                                      style: TextStyle(
+                                                        color: nearlyFull
+                                                            ? const Color(
+                                                                0xFFC24E58,
+                                                              )
+                                                            : const Color(
+                                                                0xFF8B7B98,
+                                                              ),
+                                                        fontSize: 10,
+                                                        fontWeight: nearlyFull
+                                                            ? FontWeight.w700
+                                                            : FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                            decoration: InputDecoration(
+                                              hintText: 'Type a message...',
+                                              border: InputBorder.none,
+                                              isDense: true,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 11,
+                                                  ),
+                                              suffixIcon:
+                                                  controller.text.isEmpty
+                                                  ? null
+                                                  : IconButton(
+                                                      onPressed: _clearComposer,
+                                                      tooltip: 'Clear message',
+                                                      visualDensity:
+                                                          VisualDensity.compact,
+                                                      icon: const Icon(
+                                                        Icons.cancel_rounded,
+                                                        size: 18,
+                                                        color: Color(
+                                                          0xFF9A92A3,
+                                                        ),
+                                                      ),
+                                                    ),
+                                              suffixIconConstraints:
+                                                  const BoxConstraints(
+                                                    minWidth: 34,
+                                                    minHeight: 34,
+                                                  ),
+                                            ),
+                                            onSubmitted: (_) => send(),
+                                          ),
+                                        ),
+                                      ),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: voiceInputMode
+                                          ? null
+                                          : _toggleEmojiPicker,
                                       tooltip: showEmojiPicker
                                           ? 'Close emoji picker'
                                           : 'Open emoji picker',
                                       style: IconButton.styleFrom(
-                                        backgroundColor: showEmojiPicker
-                                            ? const Color(0xFFE8DDF6)
-                                            : Colors.transparent,
-                                        foregroundColor: showEmojiPicker
-                                            ? const Color(0xFF7653A5)
-                                            : const Color(0xFF625B68),
+                                        foregroundColor: const Color(
+                                          0xFF5F3F86,
+                                        ),
                                       ),
-                                      icon: AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 160,
-                                        ),
-                                        child: Icon(
-                                          showEmojiPicker
-                                              ? Icons
-                                                    .sentiment_satisfied_alt_rounded
-                                              : Icons
-                                                    .sentiment_satisfied_alt_outlined,
-                                          key: ValueKey(showEmojiPicker),
-                                        ),
+                                      icon: Icon(
+                                        showEmojiPicker
+                                            ? Icons
+                                                  .sentiment_satisfied_alt_rounded
+                                            : Icons
+                                                  .sentiment_satisfied_alt_outlined,
                                       ),
                                     ),
                                     IconButton(
@@ -1642,7 +1843,12 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                                       onPressed: uploading
                                           ? null
                                           : _showImageSource,
-                                      tooltip: 'Attach',
+                                      tooltip: 'More',
+                                      style: IconButton.styleFrom(
+                                        foregroundColor: const Color(
+                                          0xFF5F3F86,
+                                        ),
+                                      ),
                                       icon: uploading
                                           ? const SizedBox(
                                               width: 18,
@@ -1652,141 +1858,33 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                                               ),
                                             )
                                           : const Icon(
-                                              Icons.attach_file_rounded,
+                                              Icons.add_circle_outline_rounded,
+                                              size: 25,
                                             ),
                                     ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: uploading
-                                          ? null
-                                          : () => _pickImage(
-                                              ImageSource.camera,
-                                              closeSourceSheet: false,
-                                            ),
-                                      tooltip: 'Camera',
-                                      icon: const Icon(
-                                        Icons.photo_camera_outlined,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: ConstrainedBox(
-                                        constraints: const BoxConstraints(
-                                          minHeight: 42,
-                                          maxHeight: 104,
-                                        ),
-                                        child: TextField(
-                                          controller: controller,
-                                          focusNode: messageFocusNode,
-                                          onTapOutside: (_) =>
-                                              messageFocusNode.unfocus(),
-                                          textAlignVertical:
-                                              TextAlignVertical.center,
-                                          onTap: () {
-                                            if (showEmojiPicker) {
-                                              setState(
-                                                () => showEmojiPicker = false,
-                                              );
-                                            }
-                                          },
-                                          maxLines: 4,
-                                          minLines: 1,
-                                          maxLength: 2000,
-                                          buildCounter:
-                                              (
-                                                context, {
-                                                required currentLength,
-                                                required isFocused,
-                                                required maxLength,
-                                              }) {
-                                                if (currentLength < 1800) {
-                                                  return const SizedBox.shrink();
-                                                }
-                                                final nearlyFull =
-                                                    currentLength >= 1950;
-                                                return Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        right: 4,
-                                                        top: 2,
-                                                      ),
-                                                  child: Text(
-                                                    '${2000 - currentLength} characters left',
-                                                    style: TextStyle(
-                                                      color: nearlyFull
-                                                          ? const Color(
-                                                              0xFFC24E58,
-                                                            )
-                                                          : const Color(
-                                                              0xFF8B7B98,
-                                                            ),
-                                                      fontSize: 10,
-                                                      fontWeight: nearlyFull
-                                                          ? FontWeight.w700
-                                                          : FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                          decoration: InputDecoration(
-                                            hintText: 'Type a message...',
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  vertical: 11,
-                                                ),
-                                            suffixIcon: controller.text.isEmpty
-                                                ? null
-                                                : IconButton(
-                                                    onPressed: _clearComposer,
-                                                    tooltip: 'Clear message',
-                                                    visualDensity:
-                                                        VisualDensity.compact,
-                                                    icon: const Icon(
-                                                      Icons.cancel_rounded,
-                                                      size: 18,
-                                                      color: Color(0xFF9A92A3),
-                                                    ),
-                                                  ),
-                                            suffixIconConstraints:
-                                                const BoxConstraints(
-                                                  minWidth: 34,
-                                                  minHeight: 34,
-                                                ),
+                                    if (!voiceInputMode &&
+                                        controller.text.trim().isNotEmpty)
+                                      IconButton.filled(
+                                        visualDensity: VisualDensity.compact,
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF7653A5,
                                           ),
-                                          onSubmitted: (_) => send(),
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor: const Color(
+                                            0xFFD9CDE8,
+                                          ),
+                                          disabledForegroundColor:
+                                              Colors.white70,
                                         ),
-                                      ),
-                                    ),
-                                    IconButton.filled(
-                                      visualDensity: VisualDensity.compact,
-                                      style: IconButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFFB49ADF,
-                                        ),
-                                      ),
-                                      onPressed: uploading || sending
-                                          ? null
-                                          : controller.text.trim().isNotEmpty
-                                          ? send
-                                          : _startRecording,
-                                      tooltip: sending
-                                          ? 'Sending message'
-                                          : controller.text.trim().isNotEmpty
-                                          ? 'Send message'
-                                          : 'Record voice message',
-                                      icon: AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 180,
-                                        ),
-                                        transitionBuilder: (child, animation) =>
-                                            ScaleTransition(
-                                              scale: animation,
-                                              child: child,
-                                            ),
-                                        child: sending
+                                        onPressed: uploading || sending
+                                            ? null
+                                            : send,
+                                        tooltip: sending
+                                            ? 'Sending message'
+                                            : 'Send message',
+                                        icon: sending
                                             ? const SizedBox(
-                                                key: ValueKey('sending'),
                                                 width: 18,
                                                 height: 18,
                                                 child:
@@ -1795,23 +1893,11 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                                                       color: Colors.white,
                                                     ),
                                               )
-                                            : Icon(
-                                                controller.text
-                                                        .trim()
-                                                        .isNotEmpty
-                                                    ? Icons.send_rounded
-                                                    : Icons.mic_rounded,
-                                                key: ValueKey(
-                                                  controller.text
-                                                          .trim()
-                                                          .isNotEmpty
-                                                      ? 'send'
-                                                      : 'voice',
-                                                ),
+                                            : const Icon(
+                                                Icons.send_rounded,
                                                 size: 19,
                                               ),
                                       ),
-                                    ),
                                   ],
                                 ),
                         ),
@@ -1900,7 +1986,153 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
           ),
   );
 
+  void _installFloatingPetOverlay() {
+    if (!mounted || floatingPetOverlayEntry != null) return;
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    floatingPetOverlayEntry = OverlayEntry(
+      builder: (overlayContext) => _buildFloatingPetOverlay(overlayContext),
+    );
+    overlay.insert(floatingPetOverlayEntry!);
+  }
+
+  Widget _buildFloatingPetOverlay(BuildContext overlayContext) =>
+      Positioned.fill(
+        child: StreamBuilder<SharedPet?>(
+          stream: sharedPetService.watchSharedPetWith(widget.user.uid),
+          builder: (context, snapshot) {
+            final pet = snapshot.data;
+            if (pet == null) {
+              return const IgnorePointer(child: SizedBox.expand());
+            }
+
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                const petHitSize = 108.0;
+                const visibleGrip = 20.0;
+
+                final minX = -(petHitSize - visibleGrip);
+                final minY = -(petHitSize - visibleGrip);
+                final maxX = constraints.maxWidth - visibleGrip;
+                final maxY = constraints.maxHeight - visibleGrip;
+
+                final left = (minX + floatingPetAnchor.dx * (maxX - minX))
+                    .clamp(minX, maxX)
+                    .toDouble();
+                final top = (minY + floatingPetAnchor.dy * (maxY - minY))
+                    .clamp(minY, maxY)
+                    .toDouble();
+
+                if (!floatingPetVisible) {
+                  return const IgnorePointer(child: SizedBox.expand());
+                }
+
+                return Stack(
+                  children: [
+                    Positioned(
+                      left: left,
+                      top: top,
+                      child: FloatingPetActor(
+                        visualSize: 92,
+                        hitSize: 108,
+                        onTap: () => _showFloatingPetMenu(pet),
+                        onDragUpdate: (delta) {
+                          final nextX = (left + delta.dx)
+                              .clamp(minX, maxX)
+                              .toDouble();
+                          final nextY = (top + delta.dy)
+                              .clamp(minY, maxY)
+                              .toDouble();
+
+                          floatingPetAnchor = Offset(
+                            (nextX - minX) / (maxX - minX),
+                            (nextY - minY) / (maxY - minY),
+                          );
+
+                          // Rebuild only the OverlayEntry, not the whole chat.
+                          floatingPetOverlayEntry?.markNeedsBuild();
+                        },
+                        onDragEnd: _saveFloatingPetState,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      );
+
+  Future<void> _showFloatingPetMenu(SharedPet pet) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.pets_rounded),
+              title: const Text('View pet details'),
+              onTap: () => Navigator.pop(sheetContext, 'details'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite_outline_rounded),
+              title: const Text('Quick care'),
+              onTap: () => Navigator.pop(sheetContext, 'care'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.visibility_off_outlined),
+              title: const Text('Hide pet'),
+              onTap: () => Navigator.pop(sheetContext, 'hide'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == 'details') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
+      );
+    } else if (action == 'care') {
+      await _showPetQuickCare(pet);
+    } else if (action == 'hide') {
+      await _setFloatingPetVisible(false);
+    }
+  }
+
+  Future<void> _saveFloatingPetState() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(service.myId)
+          .collection('contactPreferences')
+          .doc(widget.user.uid)
+          .set({
+            'floatingPetX': floatingPetAnchor.dx,
+            'floatingPetY': floatingPetAnchor.dy,
+            'floatingPetVisible': floatingPetVisible,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    } catch (_) {
+      // Floating pet preferences are cosmetic and must never block chat.
+    }
+  }
+
+  Future<void> _setFloatingPetVisible(bool value) async {
+    if (!mounted) return;
+    floatingPetVisible = value;
+    floatingPetOverlayEntry?.markNeedsBuild();
+    await _saveFloatingPetState();
+  }
+
   void _toggleEmojiPicker() {
+    if (voiceInputMode) {
+      setState(() => voiceInputMode = false);
+    }
     if (!showEmojiPicker) FocusScope.of(context).unfocus();
     setState(() => showEmojiPicker = !showEmojiPicker);
   }
@@ -2172,6 +2404,23 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                   onTap: () {
                     Navigator.pop(sheetContext);
                     _showPetInviteDialog();
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    floatingPetVisible
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                  title: Text(floatingPetVisible ? 'Hide pet' : 'Show pet'),
+                  subtitle: Text(
+                    floatingPetVisible
+                        ? 'Remove Mochi from this chat screen'
+                        : 'Show Mochi on this chat screen',
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _setFloatingPetVisible(!floatingPetVisible);
                   },
                 ),
                 ListTile(
@@ -3733,166 +3982,6 @@ class _PetQuickAction extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SharedPetChatShortcut extends StatelessWidget {
-  const _SharedPetChatShortcut({
-    required this.pet,
-    required this.pendingCareStream,
-    required this.onQuickCare,
-    required this.onTap,
-  });
-
-  final SharedPet pet;
-  final Stream<int> pendingCareStream;
-  final VoidCallback onQuickCare;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 7, 12, 2),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8F3FC),
-            borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: const Color(0xFFE6DDF0)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFEAF2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.local_fire_department_rounded,
-                  color: Color(0xFFFF7196),
-                  size: 23,
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            pet.petName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF4B3F50),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          'Lv.${pet.level}',
-                          style: const TextStyle(
-                            color: Color(0xFF9A72BB),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.local_fire_department_rounded,
-                          size: 12,
-                          color: Color(0xFFFF7A6B),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${pet.streakDays} day streak',
-                          style: const TextStyle(
-                            color: Color(0xFF8C7F91),
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          pet.evolutionStage.shortLabel,
-                          style: const TextStyle(
-                            color: Color(0xFF9A72BB),
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StreamBuilder<int>(
-                    stream: pendingCareStream,
-                    initialData: 0,
-                    builder: (context, snapshot) {
-                      final count = snapshot.data ?? 0;
-                      if (count <= 0) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return Container(
-                        constraints: const BoxConstraints(minWidth: 25),
-                        height: 25,
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF668F),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          count > 9 ? '9+' : '$count',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 5),
-                  IconButton(
-                    tooltip: 'Quick care',
-                    onPressed: onQuickCare,
-                    icon: const Icon(
-                      Icons.favorite_outline_rounded,
-                      color: Color(0xFF9A72BB),
-                      size: 20,
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Color(0xFFB9AFC0),
-                    size: 20,
-                  ),
-                ],
               ),
             ],
           ),

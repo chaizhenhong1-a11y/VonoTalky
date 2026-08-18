@@ -41,7 +41,7 @@ class _ContactsPageState extends State<ContactsPage> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 10, 6),
+              padding: const EdgeInsets.fromLTRB(18, 14, 10, 6),
               child: Row(
                 children: [
                   Expanded(
@@ -70,7 +70,7 @@ class _ContactsPageState extends State<ContactsPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
               child: TextField(
                 onChanged: (value) => setState(() {
                   query = value.trim().toLowerCase();
