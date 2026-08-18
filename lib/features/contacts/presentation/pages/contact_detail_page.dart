@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../chat/data/models/chat_user.dart';
 import '../../data/services/contact_detail_service.dart';
+import '../../../space/presentation/pages/friend_tree_page.dart';
 
 class ContactDetailPage extends StatelessWidget {
   ContactDetailPage({super.key, required this.user, required this.onMessage});
@@ -55,8 +56,102 @@ class ContactDetailPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _InfoCard(user: current),
+
+                  _InfoCard(
+                    user: current,
+                  ),
+
                   const SizedBox(height: 16),
+
+                  Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (context) {
+                              return FriendTreePage(
+                                user: current,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 17,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFFE8F1DF,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  14,
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.park_rounded,
+                                color: Color(
+                                  0xFF668052,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(
+                              width: 14,
+                            ),
+
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Visit Tree',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: 3,
+                                  ),
+                                  Text(
+                                    'Leave a tag on their tree',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(
+                                        0xFF837C86,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: Color(
+                                0xFFAAA3AC,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
                   StreamBuilder<Map<String, dynamic>>(
                     stream: _service.preferences(current.uid),
                     builder: (context, snapshot) {
