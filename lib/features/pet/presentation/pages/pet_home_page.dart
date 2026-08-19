@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../data/models/shared_pet.dart';
+import '../../animation/pet_actor.dart';
 import '../../data/models/pet_invite.dart';
+import '../../data/models/shared_pet.dart';
 import '../../data/services/pet_invite_service.dart';
 import '../../data/services/shared_pet_service.dart';
 import 'shared_pet_detail_page.dart';
@@ -14,11 +15,13 @@ class PetHomePage extends StatefulWidget {
 }
 
 class _PetHomePageState extends State<PetHomePage> {
-  final service = SharedPetService();
-  final inviteService = PetInviteService();
+  final SharedPetService service = SharedPetService();
+  final PetInviteService inviteService = PetInviteService();
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -30,47 +33,39 @@ class _PetHomePageState extends State<PetHomePage> {
             }
 
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(
+                child: CircularProgressIndicator(color: colors.primary),
+              );
             }
 
             final pets = snapshot.data!;
+
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(child: _header()),
-                SliverToBoxAdapter(child: _summary(pets)),
-                SliverToBoxAdapter(child: _inviteInbox()),
+                SliverToBoxAdapter(child: _header(context)),
+                SliverToBoxAdapter(child: _compactInviteBanner()),
                 if (pets.isEmpty)
-                  SliverFillRemaining(
+                  const SliverFillRemaining(
                     hasScrollBody: false,
                     child: _EmptyPetCenter(),
                   )
-                else ...[
+                else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
                     sliver: SliverList.separated(
                       itemCount: pets.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         final pet = pets[index];
-                        return _PetCard(
+                        return _SimplePetCard(
                           pet: pet,
                           myId: service.myId,
-                          service: service,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  SharedPetDetailPage(petId: pet.id),
-                            ),
-                          ),
+                          onTap: () => _openPet(pet),
                         );
                       },
                     ),
                   ),
-                  SliverToBoxAdapter(child: _inviteHint()),
-                  const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                ],
               ],
             );
           },
@@ -79,14 +74,59 @@ class _PetHomePageState extends State<PetHomePage> {
     );
   }
 
-  Widget _inviteInbox() {
+  Widget _header(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.pets_rounded, color: colors.primary, size: 21),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pet Center',
+                  style: TextStyle(
+                    color: colors.onSurface,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -.45,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Pets you are raising with friends',
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _compactInviteBanner() {
     return StreamBuilder<List<PetInvite>>(
       stream: inviteService.watchMyPendingInvites(),
       builder: (context, snapshot) {
         final invites = snapshot.data ?? const <PetInvite>[];
-        if (!snapshot.hasData || invites.isEmpty) {
-          return const SizedBox.shrink();
-        }
+        if (invites.isEmpty) return const SizedBox(height: 2);
 
         final incoming = invites
             .where((invite) => invite.receiverId == inviteService.myId)
@@ -95,199 +135,112 @@ class _PetHomePageState extends State<PetHomePage> {
             .where((invite) => invite.senderId == inviteService.myId)
             .toList();
 
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: .18),
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0B000000),
-                blurRadius: 14,
-                offset: Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: .12),
-                    child: Icon(
-                      Icons.mail_outline_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 19,
+        final colors = Theme.of(context).colorScheme;
+        final label = incoming.isNotEmpty
+            ? '${incoming.length} pet invitation${incoming.length == 1 ? '' : 's'}'
+            : '${outgoing.length} invitation${outgoing.length == 1 ? '' : 's'} waiting';
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 5, 16, 5),
+          child: Material(
+            color: colors.primary.withValues(alpha: .07),
+            borderRadius: BorderRadius.circular(17),
+            child: InkWell(
+              onTap: () => _showInvites(incoming, outgoing),
+              borderRadius: BorderRadius.circular(17),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      incoming.isNotEmpty
+                          ? Icons.mail_outline_rounded
+                          : Icons.schedule_rounded,
+                      size: 18,
+                      color: colors.primary,
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Pet invitations',
-                          style: TextStyle(
-                            color: Color(0xFF443847),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                          ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: colors.onSurface,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Shared-pet invitations from your chats',
-                          style: TextStyle(
-                            color: Color(0xFF978A99),
-                            fontSize: 9.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    constraints: const BoxConstraints(minWidth: 24),
-                    height: 24,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Text(
-                      '${invites.length}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                  ),
-                ],
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 19,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
               ),
-              if (incoming.isNotEmpty) ...[
-                const SizedBox(height: 13),
-                ...incoming.map(_incomingInviteCard),
-              ],
-              if (outgoing.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                ...outgoing.map(_outgoingInviteCard),
-              ],
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _incomingInviteCard(PetInvite invite) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 9),
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFF0F5), Color(0xFFF7F1FC)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.pets_rounded, color: Color(0xFF9B6CC5), size: 18),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
+  Future<void> _showInvites(
+    List<PetInvite> incoming,
+    List<PetInvite> outgoing,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final colors = Theme.of(sheetContext).colorScheme;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${invite.senderName} invited you',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF514453),
-                    fontSize: 10.5,
+                  'Pet invitations',
+                  style: TextStyle(
+                    color: colors.onSurface,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Raise “${invite.petName}” together',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF928496),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
+                if (incoming.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  ...incoming.map(
+                    (invite) => _IncomingInviteTile(
+                      invite: invite,
+                      onAccept: () async {
+                        Navigator.pop(sheetContext);
+                        await _acceptInvite(invite);
+                      },
+                      onDecline: () async {
+                        Navigator.pop(sheetContext);
+                        await _rejectInvite(invite);
+                      },
+                    ),
                   ),
-                ),
+                ],
+                if (outgoing.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  ...outgoing.map(
+                    (invite) => _OutgoingInviteTile(invite: invite),
+                  ),
+                ],
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Decline',
-            onPressed: () => _rejectInvite(invite),
-            icon: const Icon(
-              Icons.close_rounded,
-              size: 19,
-              color: Color(0xFF9E8590),
-            ),
-          ),
-          FilledButton(
-            onPressed: () => _acceptInvite(invite),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-            ),
-            child: const Text('Accept'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _outgoingInviteCard(PetInvite invite) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 7),
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F3F9),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.schedule_rounded,
-            size: 17,
-            color: Color(0xFF9B79C8),
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              'Waiting for ${invite.receiverName} · ${invite.petName}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF786A7C),
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -335,372 +288,136 @@ class _PetHomePageState extends State<PetHomePage> {
     }
   }
 
-  Widget _header() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 6),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFEAF2),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.pets_rounded, color: Color(0xFFFF6F9D)),
-          ),
-          const SizedBox(width: 11),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pet Center',
-                  style: TextStyle(
-                    color: Color(0xFF2E2632),
-                    fontSize: 23,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Pets you are raising with friends',
-                  style: TextStyle(
-                    color: Color(0xFF968A9A),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const _FirebaseBadge(),
-        ],
-      ),
-    );
-  }
-
-  Widget _summary(List<SharedPet> pets) {
-    final totalStreak = pets.fold<int>(0, (sum, pet) => sum + pet.streakDays);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFEAF2), Color(0xFFF1EAFE)],
-        ),
-        borderRadius: BorderRadius.circular(26),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _summaryStat(
-              Icons.pets_rounded,
-              '${pets.length}',
-              'Shared pets',
-            ),
-          ),
-          Container(width: 1, height: 42, color: const Color(0x22A58BA7)),
-          Expanded(
-            child: _summaryStat(
-              Icons.local_fire_department_rounded,
-              '$totalStreak',
-              'Total streak days',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryStat(IconData icon, String value, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: const Color(0xFF8C6AB8), size: 21),
-        const SizedBox(height: 5),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Color(0xFF403347),
-            fontSize: 20,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF918493),
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _inviteHint() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFFDCE7)),
-      ),
-      child: const Row(
-        children: [
-          CircleAvatar(
-            radius: 23,
-            backgroundColor: Color(0xFFFFF0F5),
-            child: Icon(
-              Icons.person_add_alt_1_rounded,
-              color: Color(0xFFFF759E),
-            ),
-          ),
-          SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Raise another pet',
-                  style: TextStyle(
-                    color: Color(0xFF443947),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'The next phase will connect this to the friend-chat invite flow.',
-                  style: TextStyle(
-                    color: Color(0xFF958A97),
-                    fontSize: 10,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  void _openPet(SharedPet pet) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
     );
   }
 }
 
-class _PetCard extends StatelessWidget {
-  const _PetCard({
+class _SimplePetCard extends StatelessWidget {
+  const _SimplePetCard({
     required this.pet,
     required this.myId,
-    required this.service,
     required this.onTap,
   });
 
   final SharedPet pet;
   final String myId;
-  final SharedPetService service;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final friendName = pet.friendName(myId);
-    final friendId = pet.friendId(myId);
-    final myContribution = pet.contributionFor(myId);
-    final friendContribution = pet.contributionFor(friendId);
-    final total = myContribution + friendContribution;
-    final myPercent = total == 0 ? 50 : (myContribution * 100 / total).round();
-    final friendPercent = 100 - myPercent;
 
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(27),
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(28),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(27),
         child: Container(
-          padding: const EdgeInsets.all(15),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(27),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: colors.primary.withValues(alpha: .10)),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x0C000000),
-                blurRadius: 15,
-                offset: Offset(0, 6),
+                color: Color(0x09000000),
+                blurRadius: 18,
+                offset: Offset(0, 7),
               ),
             ],
           ),
-          child: Row(
+          child: Column(
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  _MiniFlameAvatar(
-                    stage: pet.evolutionStage,
-                    theme: pet.petTheme,
+              SizedBox(
+                height: 172,
+                child: Center(
+                  child: PetActor(
+                    // This is exactly the same PetActor used by the floating pet.
+                    // It replaces the old flame-person avatar on Pet Center.
+                    visualSize: 150,
+                    hitSize: 168,
+                    onDragUpdate: (_) {},
+                    onDragEnd: () {},
+                    onTap: onTap,
                   ),
-                  Positioned(
-                    top: -5,
-                    right: -5,
-                    child: StreamBuilder<int>(
-                      stream: service.watchIncomingCareRequestCount(pet.id),
-                      initialData: 0,
-                      builder: (context, snapshot) {
-                        final count = snapshot.data ?? 0;
-                        if (count <= 0) return const SizedBox.shrink();
-
-                        return Container(
-                          constraints: const BoxConstraints(minWidth: 21),
-                          height: 21,
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF668F),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          pet.petName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurface,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
                           ),
-                          child: Text(
-                            count > 9 ? '9+' : '$count',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              height: 1,
-                              fontWeight: FontWeight.w900,
-                            ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'with $friendName',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.onSurfaceVariant,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
                           ),
-                        );
-                      },
+                        ),
+                      ],
+                    ),
+                  ),
+                  _LevelChip(level: pet.level),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniStat(
+                      icon: Icons.favorite_rounded,
+                      label: 'Bond',
+                      value: '${pet.bondPercent()}%',
+                      color: const Color(0xFFFF7199),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MiniStat(
+                      icon: Icons.local_fire_department_rounded,
+                      label: 'Streak',
+                      value: '${pet.streakDays} days',
+                      color: const Color(0xFFFF826B),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            pet.petName,
-                            style: const TextStyle(
-                              color: Color(0xFF382F3B),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          'Lv.${pet.level}',
-                          style: const TextStyle(
-                            color: Color(0xFFFF7DA4),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
+              const SizedBox(height: 13),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: onTap,
+                  icon: const Icon(Icons.pets_rounded, size: 18),
+                  label: const Text('View pet'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'with $friendName',
-                      style: const TextStyle(
-                        color: Color(0xFF948997),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _EvolutionChip(stage: pet.evolutionStage),
-                    const SizedBox(height: 6),
-                    StreamBuilder<int>(
-                      stream: service.watchIncomingCareRequestCount(pet.id),
-                      initialData: 0,
-                      builder: (context, snapshot) {
-                        final count = snapshot.data ?? 0;
-                        if (count <= 0) {
-                          return const SizedBox(height: 3);
-                        }
-
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFEDF4),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.notifications_active_rounded,
-                                size: 13,
-                                color: Color(0xFFFF668F),
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                count == 1
-                                    ? '1 care request'
-                                    : '$count care requests',
-                                style: const TextStyle(
-                                  color: Color(0xFFCE5276),
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 9),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.local_fire_department_rounded,
-                          size: 15,
-                          color: Color(0xFFFF7A6B),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${pet.streakDays} days',
-                          style: const TextStyle(
-                            color: Color(0xFF6C5D70),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(
-                          Icons.favorite_rounded,
-                          size: 14,
-                          color: Color(0xFFFF7DA4),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          'Bond ${pet.bondPercent()}%',
-                          style: const TextStyle(
-                            color: Color(0xFF6C5D70),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 9),
-                    _ContributionBar(
-                      you: myPercent,
-                      friend: friendPercent,
-                      friendName: friendName,
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: Color(0xFFC4B9C6)),
             ],
           ),
         ),
@@ -709,171 +426,201 @@ class _PetCard extends StatelessWidget {
   }
 }
 
-class _ContributionBar extends StatelessWidget {
-  const _ContributionBar({
-    required this.you,
-    required this.friend,
-    required this.friendName,
-  });
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({required this.level});
 
-  final int you;
-  final int friend;
-  final String friendName;
+  final int level;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            height: 6,
-            child: Row(
-              children: [
-                Expanded(
-                  flex: you <= 0 ? 1 : you,
-                  child: Container(color: const Color(0xFFFF7DA4)),
-                ),
-                Expanded(
-                  flex: friend <= 0 ? 1 : friend,
-                  child: Container(color: const Color(0xFFE9E2EC)),
-                ),
-              ],
-            ),
-          ),
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Text(
+        'Lv.$level',
+        style: TextStyle(
+          color: colors.primary,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w900,
         ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Text(
-              'You $you%',
-              style: const TextStyle(
-                color: Color(0xFFA091A3),
-                fontSize: 8,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              '$friendName $friend%',
-              style: const TextStyle(
-                color: Color(0xFFA091A3),
-                fontSize: 8,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _MiniFlameAvatar extends StatelessWidget {
-  const _MiniFlameAvatar({required this.stage, required this.theme});
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
-  final PetEvolutionStage stage;
-  final String theme;
-
-  Color get _themeColor => switch (theme) {
-    'violet' => const Color(0xFF9C70DB),
-    'sunset' => const Color(0xFFFF8A65),
-    'ocean' => const Color(0xFF5B9DE8),
-    _ => const Color(0xFFFF7196),
-  };
-
-  Color get _color {
-    final base = _themeColor;
-    return switch (stage) {
-      PetEvolutionStage.seed => Color.lerp(base, Colors.white, .18)!,
-      PetEvolutionStage.spark => base,
-      PetEvolutionStage.flame => Color.lerp(
-        base,
-        const Color(0xFF7B5AD7),
-        .35,
-      )!,
-      PetEvolutionStage.nova => Color.lerp(base, const Color(0xFF496FE6), .55)!,
-    };
-  }
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Container(
-      width: 70,
-      height: 78,
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
       decoration: BoxDecoration(
-        color: _color.withAlpha(24),
-        borderRadius: BorderRadius.circular(22),
+        color: colors.surfaceContainerHighest.withValues(alpha: .42),
+        borderRadius: BorderRadius.circular(17),
       ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
         children: [
-          Icon(
-            Icons.local_fire_department_rounded,
-            size: stage == PetEvolutionStage.nova ? 52 : 46,
-            color: _color,
-          ),
-          if (stage == PetEvolutionStage.nova)
-            const Positioned(
-              top: 7,
-              right: 8,
-              child: Icon(
-                Icons.auto_awesome_rounded,
-                size: 17,
-                color: Color(0xFFFFD967),
-              ),
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colors.onSurface,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _EvolutionChip extends StatelessWidget {
-  const _EvolutionChip({required this.stage});
+class _IncomingInviteTile extends StatelessWidget {
+  const _IncomingInviteTile({
+    required this.invite,
+    required this.onAccept,
+    required this.onDecline,
+  });
 
-  final PetEvolutionStage stage;
+  final PetInvite invite;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6EFFA),
-          borderRadius: BorderRadius.circular(12),
+          color: colors.primary.withValues(alpha: .06),
+          borderRadius: BorderRadius.circular(18),
         ),
-        child: Text(
-          stage.label,
-          style: const TextStyle(
-            color: Color(0xFF8A67A7),
-            fontSize: 8.5,
-            fontWeight: FontWeight.w900,
-          ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 19,
+              backgroundColor: colors.surface,
+              child: Icon(Icons.pets_rounded, size: 18, color: colors.primary),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${invite.senderName} invited you',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurface,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Raise “${invite.petName}” together',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 9,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Decline',
+              onPressed: onDecline,
+              icon: Icon(
+                Icons.close_rounded,
+                color: colors.onSurfaceVariant,
+                size: 18,
+              ),
+            ),
+            FilledButton(onPressed: onAccept, child: const Text('Accept')),
+          ],
         ),
       ),
     );
   }
 }
 
-class _FirebaseBadge extends StatelessWidget {
-  const _FirebaseBadge();
+class _OutgoingInviteTile extends StatelessWidget {
+  const _OutgoingInviteTile({required this.invite});
+
+  final PetInvite invite;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF0D9),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: const Text(
-        'LIVE',
-        style: TextStyle(
-          color: Color(0xFF9A692E),
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
+    final colors = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest.withValues(alpha: .42),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.schedule_rounded, size: 17, color: colors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Waiting for ${invite.receiverName} · ${invite.petName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.onSurfaceVariant,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -885,39 +632,40 @@ class _EmptyPetCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.fromLTRB(28, 26, 28, 44),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFECF3),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.pets_rounded,
-              size: 43,
-              color: Color(0xFFFF78A0),
+          SizedBox(
+            height: 180,
+            child: Center(
+              child: PetActor(
+                visualSize: 145,
+                hitSize: 165,
+                onDragUpdate: (_) {},
+                onDragEnd: () {},
+                onTap: () {},
+              ),
             ),
           ),
-          const SizedBox(height: 18),
-          const Text(
+          const SizedBox(height: 8),
+          Text(
             'No shared pets yet',
             style: TextStyle(
-              color: Color(0xFF3D3340),
+              color: colors.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 7),
-          const Text(
-            'Your Firebase Pet Center is ready. Start a shared pet from a friend chat in the next phase.',
+          Text(
+            'Start a shared pet from a friend chat.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Color(0xFF938795),
+              color: colors.onSurfaceVariant,
               fontSize: 11,
               height: 1.4,
             ),
@@ -935,12 +683,31 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          'Pet Center could not load.\n\n$message',
-          textAlign: TextAlign.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pets_rounded, size: 38, color: colors.primary),
+            const SizedBox(height: 12),
+            Text(
+              'Pet Center could not load.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: colors.onSurface,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10),
+            ),
+          ],
         ),
       ),
     );

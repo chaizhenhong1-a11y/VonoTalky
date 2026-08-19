@@ -9,12 +9,16 @@ class _PetQuickAction extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final disabled = onTap == null;
+
     return Material(
-      color: const Color(0xFFFFF0F5),
+      color: disabled
+          ? const Color(0xFFF4F1F4)
+          : const Color(0xFFFFF0F5),
       borderRadius: BorderRadius.circular(19),
       child: InkWell(
         onTap: onTap,
@@ -24,12 +28,20 @@ class _PetQuickAction extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: const Color(0xFFFF7196), size: 22),
+              Icon(
+                icon,
+                color: disabled
+                    ? const Color(0xFFB9B0B8)
+                    : const Color(0xFFFF7196),
+                size: 22,
+              ),
               const SizedBox(height: 5),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFF5A4A5E),
+                style: TextStyle(
+                  color: disabled
+                      ? const Color(0xFFA59CA4)
+                      : const Color(0xFF5A4A5E),
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                 ),
@@ -72,7 +84,10 @@ class _PetInviteBanner extends StatelessWidget {
           const CircleAvatar(
             radius: 21,
             backgroundColor: Colors.white,
-            child: Icon(Icons.pets_rounded, color: Color(0xFF9B6CC5)),
+            child: Icon(
+              Icons.pets_rounded,
+              color: Color(0xFF9B6CC5),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -105,7 +120,10 @@ class _PetInviteBanner extends StatelessWidget {
             IconButton(
               onPressed: onReject,
               tooltip: 'Decline',
-              icon: const Icon(Icons.close_rounded, color: Color(0xFF9B7C8C)),
+              icon: const Icon(
+                Icons.close_rounded,
+                color: Color(0xFF9B7C8C),
+              ),
             ),
             FilledButton(
               onPressed: onAccept,

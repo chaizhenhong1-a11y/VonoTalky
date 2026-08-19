@@ -119,7 +119,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
   final voiceWatch = Stopwatch();
   Timer? voiceTimer;
   OverlayEntry? floatingPetOverlayEntry;
-
+  bool floatingPetSuppressed = false;
   ChatMessagesState get _messagesState =>
       context.read<ChatMessagesBloc>().state;
   ChatComposerState get _composerState =>
@@ -2111,6 +2111,10 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                     return const IgnorePointer(child: SizedBox.expand());
                   }
 
+                  if (!floatingPetVisible || floatingPetSuppressed) {
+                    return const IgnorePointer(child: SizedBox.expand());
+                  }
+
                   return Stack(
                     children: [
                       Positioned(
@@ -2150,36 +2154,46 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.pets_rounded),
-              title: const Text('View pet details'),
-              onTap: () => Navigator.pop(sheetContext, 'details'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.favorite_outline_rounded),
-              title: const Text('Quick care'),
-              onTap: () => Navigator.pop(sheetContext, 'care'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.visibility_off_outlined),
-              title: const Text('Hide pet'),
-              onTap: () => Navigator.pop(sheetContext, 'hide'),
-            ),
-          ],
+      builder: (sheetContext) => Material(
+        color: Colors.transparent,
+        child: SafeArea(
+          top: false,
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.pets_rounded),
+                title: const Text('View pet details'),
+                onTap: () => Navigator.pop(sheetContext, 'details'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.favorite_outline_rounded),
+                title: const Text('Quick care'),
+                onTap: () => Navigator.pop(sheetContext, 'care'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: const Text('Hide pet'),
+                onTap: () => Navigator.pop(sheetContext, 'hide'),
+              ),
+            ],
+          ),
         ),
       ),
     );
 
     if (!mounted || action == null) return;
     if (action == 'details') {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
-      );
+      floatingPetSuppressed = true;
+      floatingPetOverlayEntry?.markNeedsBuild();
+      try {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
+        );
+      } finally {
+        floatingPetSuppressed = false;
+        floatingPetOverlayEntry?.markNeedsBuild();
+      }
     } else if (action == 'care') {
       await _showPetQuickCare(pet);
     } else if (action == 'hide') {
@@ -2330,9 +2344,15 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                   Expanded(
                     child: _PetQuickAction(
                       icon: Icons.sports_esports_rounded,
-                      label: 'Play',
-                      onTap: () =>
-                          Navigator.pop(sheetContext, SharedPetAction.play),
+                      label: pet.energy < SharedPetService.minimumPlayEnergy
+                          ? 'Too tired'
+                          : 'Play',
+                      onTap: pet.energy < SharedPetService.minimumPlayEnergy
+                          ? null
+                          : () => Navigator.pop(
+                              sheetContext,
+                              SharedPetAction.play,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 9),
@@ -2346,6 +2366,18 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                   ),
                 ],
               ),
+              if (pet.energy < SharedPetService.minimumPlayEnergy) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Too tired to play · Feed first to restore energy.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF918493),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
