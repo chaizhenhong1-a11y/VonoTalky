@@ -6,6 +6,8 @@ import '../models/shared_pet_memory.dart';
 import '../models/pet_care_request.dart';
 
 class SharedPetService {
+  static const int minimumPlayEnergy = 8;
+
   SharedPetService({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _firestore = firestore ?? FirebaseFirestore.instance,
       _auth = auth ?? FirebaseAuth.instance;
@@ -494,8 +496,10 @@ class SharedPetService {
           xp += 5;
           contributionGain = 3;
         case SharedPetAction.play:
-          if (energy < 8) {
-            throw StateError('Your pet needs some rest first.');
+          if (energy < minimumPlayEnergy) {
+            throw StateError(
+              'Your pet is too tired to play. Feed your pet first to restore energy.',
+            );
           }
           energy = (energy - 7).clamp(0, 100);
           affection = (affection + 8).clamp(0, 500);

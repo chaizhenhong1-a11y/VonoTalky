@@ -90,6 +90,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   String chatBackground = 'blue';
   Offset floatingPetAnchor = const Offset(0.82, 0.18);
   bool floatingPetVisible = true;
+  bool floatingPetSuppressed = false;
   OverlayEntry? floatingPetOverlayEntry;
   String? highlightedMessageId;
 
@@ -2023,7 +2024,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                     .clamp(minY, maxY)
                     .toDouble();
 
-                if (!floatingPetVisible) {
+                if (!floatingPetVisible || floatingPetSuppressed) {
                   return const IgnorePointer(child: SizedBox.expand());
                 }
 
@@ -2067,36 +2068,46 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        top: false,
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.pets_rounded),
-              title: const Text('View pet details'),
-              onTap: () => Navigator.pop(sheetContext, 'details'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.favorite_outline_rounded),
-              title: const Text('Quick care'),
-              onTap: () => Navigator.pop(sheetContext, 'care'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.visibility_off_outlined),
-              title: const Text('Hide pet'),
-              onTap: () => Navigator.pop(sheetContext, 'hide'),
-            ),
-          ],
+      builder: (sheetContext) => Material(
+        color: Colors.transparent,
+        child: SafeArea(
+          top: false,
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.pets_rounded),
+                title: const Text('View pet details'),
+                onTap: () => Navigator.pop(sheetContext, 'details'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.favorite_outline_rounded),
+                title: const Text('Quick care'),
+                onTap: () => Navigator.pop(sheetContext, 'care'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: const Text('Hide pet'),
+                onTap: () => Navigator.pop(sheetContext, 'hide'),
+              ),
+            ],
+          ),
         ),
       ),
     );
 
     if (!mounted || action == null) return;
     if (action == 'details') {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
-      );
+      floatingPetSuppressed = true;
+      floatingPetOverlayEntry?.markNeedsBuild();
+      try {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
+        );
+      } finally {
+        floatingPetSuppressed = false;
+        floatingPetOverlayEntry?.markNeedsBuild();
+      }
     } else if (action == 'care') {
       await _showPetQuickCare(pet);
     } else if (action == 'hide') {
@@ -2247,9 +2258,15 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                   Expanded(
                     child: _PetQuickAction(
                       icon: Icons.sports_esports_rounded,
-                      label: 'Play',
-                      onTap: () =>
-                          Navigator.pop(sheetContext, SharedPetAction.play),
+                      label: pet.energy < SharedPetService.minimumPlayEnergy
+                          ? 'Too tired'
+                          : 'Play',
+                      onTap: pet.energy < SharedPetService.minimumPlayEnergy
+                          ? null
+                          : () => Navigator.pop(
+                              sheetContext,
+                              SharedPetAction.play,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 9),
@@ -2263,6 +2280,18 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                   ),
                 ],
               ),
+              if (pet.energy < SharedPetService.minimumPlayEnergy) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Too tired to play · Feed first to restore energy.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF918493),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -3733,7 +3762,7 @@ class _MessageActionButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -3958,12 +3987,16 @@ class _PetQuickAction extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final disabled = onTap == null;
+
     return Material(
-      color: const Color(0xFFFFF0F5),
+      color: disabled
+          ? const Color(0xFFF4F1F4)
+          : const Color(0xFFFFF0F5),
       borderRadius: BorderRadius.circular(19),
       child: InkWell(
         onTap: onTap,
@@ -3973,12 +4006,20 @@ class _PetQuickAction extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: const Color(0xFFFF7196), size: 22),
+              Icon(
+                icon,
+                color: disabled
+                    ? const Color(0xFFB9B0B8)
+                    : const Color(0xFFFF7196),
+                size: 22,
+              ),
               const SizedBox(height: 5),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Color(0xFF5A4A5E),
+                style: TextStyle(
+                  color: disabled
+                      ? const Color(0xFFA59CA4)
+                      : const Color(0xFF5A4A5E),
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                 ),
