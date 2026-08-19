@@ -11,6 +11,7 @@ import '../../data/models/message_reply.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../data/services/chat_file_service.dart';
 import '../../data/services/chat_service.dart';
+import '../../data/services/chat_background_service.dart';
 import '../../data/services/chat_voice_service.dart';
 import '../../data/services/message_management_service.dart';
 import '../../data/services/pinned_message_service.dart';
@@ -36,6 +37,19 @@ import 'media_viewer_page.dart';
 import 'saved_messages_page.dart';
 import 'shared_media_page.dart';
 import 'chat_background_page.dart';
+
+part '../widgets/chat_room/chat_background_widgets.dart';
+part '../widgets/chat_room/chat_message_widgets.dart';
+part '../widgets/chat_room/chat_attachment_widgets.dart';
+part '../widgets/chat_room/chat_pet_widgets.dart';
+part '../widgets/chat_room/chat_selection_toolbar.dart';
+
+
+enum _ChatBackgroundViewMode {
+  mine,
+  other,
+}
+
 class RealChatRoomPage extends StatefulWidget {
   const RealChatRoomPage({super.key, required this.user});
   final ChatUser user;
@@ -53,6 +67,18 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   final voiceService = ChatVoiceService();
   final managementService = MessageManagementService();
   final contactDetailService = ContactDetailService();
+  final chatBackgroundService = ChatBackgroundService();
+  StreamSubscription<ChatBackgroundInfo>?
+      _myBackgroundSubscription;
+
+  StreamSubscription<SharedChatBackground?>?
+      _otherBackgroundSubscription;
+
+  ChatBackgroundInfo? _myBackground;
+  SharedChatBackground? _otherBackground;
+
+  _ChatBackgroundViewMode _backgroundViewMode =
+      _ChatBackgroundViewMode.mine;
   final pinnedMessageService = PinnedMessageService();
   final petInviteService = PetInviteService();
   final petChatProgressService = SharedPetChatProgressService();
@@ -99,7 +125,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     activeConversationId = service.roomId(widget.user.uid);
     notificationService.setActiveConversation(activeConversationId);
     service.markRead(widget.user.uid);
-    service.ensureConversation(widget.user.uid);
+    _initializeChatBackgrounds();
     controller.addListener(_typingChanged);
     messageScrollController.addListener(_handleMessageScroll);
     _restoreDraft();
@@ -108,6 +134,54 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       _installFloatingPetOverlay();
     });
   }
+
+  Future<void> _initializeChatBackgrounds() async {
+  try {
+    await service.ensureConversation(
+      widget.user.uid,
+    );
+
+    if (!mounted) return;
+
+    _myBackgroundSubscription =
+        chatBackgroundService
+            .watchMine(widget.user.uid)
+            .listen(
+      (background) {
+        if (!mounted) return;
+
+        setState(() {
+          _myBackground = background;
+        });
+      },
+    );
+
+    _otherBackgroundSubscription =
+        chatBackgroundService
+            .watchOther(widget.user.uid)
+            .listen(
+      (background) {
+        if (!mounted) return;
+
+        setState(() {
+          _otherBackground = background;
+
+          // 对方关闭分享或删除背景时，
+          // 如果我正在看他的背景，
+          // 自动退回自己的背景。
+          if (background == null &&
+              _backgroundViewMode ==
+                  _ChatBackgroundViewMode.other) {
+            _backgroundViewMode =
+                _ChatBackgroundViewMode.mine;
+          }
+        });
+      },
+    );
+  } catch (_) {
+    // 背景功能失败不能影响聊天功能。
+  }
+}
 
   Future<void> _restoreDraft() async {
     try {
@@ -364,6 +438,8 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
 
   @override
   void dispose() {
+    _myBackgroundSubscription?.cancel();
+    _otherBackgroundSubscription?.cancel();
     floatingPetOverlayEntry?.remove();
     floatingPetOverlayEntry = null;
     typingTimer?.cancel();
@@ -701,6 +777,29 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     Navigator.pop(context);
   }
 
+  String? get _activeBackgroundImageUrl {
+  if (_backgroundViewMode ==
+      _ChatBackgroundViewMode.other) {
+    final otherUrl =
+        _otherBackground?.imageUrl;
+
+    if (otherUrl != null &&
+        otherUrl.isNotEmpty) {
+      return otherUrl;
+    }
+  }
+
+  final myUrl =
+      _myBackground?.imageUrl;
+
+  if (myUrl != null &&
+      myUrl.isNotEmpty) {
+    return myUrl;
+  }
+
+  return null;
+}
+
   @override
   Widget build(BuildContext context) => Scaffold(
     resizeToAvoidBottomInset: true,
@@ -856,8 +955,18 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     body: Stack(
       children: [
         Container(
-          color: _chatBackgroundColor,
-          child: Column(
+  decoration: BoxDecoration(
+    color: _chatBackgroundColor,
+    image: _activeBackgroundImageUrl == null
+        ? null
+        : DecorationImage(
+            image: NetworkImage(
+              _activeBackgroundImageUrl!,
+            ),
+            fit: BoxFit.cover,
+          ),
+  ),
+  child: Column(
             children: [
               StreamBuilder<PetInvite?>(
                 stream: petInviteService.watchPendingInviteWith(
@@ -3649,703 +3758,4 @@ ListTile(
     final month = date.month.toString().padLeft(2, '0');
     return '$day/$month/${date.year}';
   }
-}
-
-class _LinkPreviewButton extends StatelessWidget {
-  const _LinkPreviewButton({required this.url, required this.onTap});
-
-  final String url;
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final uri = Uri.tryParse(url);
-    final host = uri?.host.isNotEmpty == true ? uri!.host : url;
-    return Material(
-      color: const Color(0x26FFFFFF),
-      borderRadius: BorderRadius.circular(11),
-      child: InkWell(
-        onTap: () => onTap(url),
-        borderRadius: BorderRadius.circular(11),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 38),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: const Color(0x337653A5)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.link_rounded,
-                size: 18,
-                color: Color(0xFF7653A5),
-              ),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Text(
-                  host,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF7653A5),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Icon(
-                Icons.open_in_new_rounded,
-                size: 15,
-                color: Color(0xFF7653A5),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BackgroundChoice extends StatelessWidget {
-  const _BackgroundChoice({
-    required this.label,
-    required this.color,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color color;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(18),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: selected
-                    ? const Color(0xFF7653A5)
-                    : const Color(0xFFD7D1DC),
-                width: selected ? 3 : 1,
-              ),
-            ),
-            child: selected
-                ? const Icon(Icons.check_rounded, color: Color(0xFF7653A5))
-                : null,
-          ),
-          const SizedBox(height: 7),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _MessageActionButton extends StatelessWidget {
-  const _MessageActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: Color(0xFFEDE5F8),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: const Color(0xFF7653A5), size: 22),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _AttachmentAction extends StatelessWidget {
-  const _AttachmentAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(18),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 27),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _OriginalMessagePreview extends StatelessWidget {
-  const _OriginalMessagePreview({
-    required this.data,
-    required this.mine,
-    required this.otherName,
-  });
-
-  final Map<String, dynamic> data;
-  final bool mine;
-  final String otherName;
-
-  @override
-  Widget build(BuildContext context) {
-    final deleted = data['isDeleted'] as bool? ?? false;
-    final type = data['type'] as String? ?? 'text';
-    final sentAt = (data['sentAt'] as Timestamp?)?.toDate();
-
-    final content = deleted
-        ? 'This message was deleted'
-        : switch (type) {
-            'image' => '📷 Photo',
-            'voice' || 'audio' => '🎤 Voice message',
-            'file' => '📎 ${(data['fileName'] as String? ?? 'File').trim()}',
-            _ =>
-              (data['text'] as String? ?? '').trim().isEmpty
-                  ? 'Message'
-                  : (data['text'] as String).trim(),
-          };
-
-    final sender = mine ? 'You' : otherName;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Original message',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFF4D4652),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: mine ? const Color(0xFFF0E5FF) : const Color(0xFFFFFBF3),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE6DEE9)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      sender,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF7653A5),
-                      ),
-                    ),
-                  ),
-                  if (sentAt != null)
-                    Text(
-                      _formatPreviewTime(sentAt),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF9B919E),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              Text(
-                content,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.35,
-                  color: deleted
-                      ? const Color(0xFF9A919B)
-                      : const Color(0xFF403942),
-                  fontStyle: deleted ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'This message is older than the currently loaded chat window.',
-          style: TextStyle(fontSize: 10, color: Color(0xFF9B919E)),
-        ),
-      ],
-    );
-  }
-
-  static String _formatPreviewTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    final day = time.day.toString().padLeft(2, '0');
-    final month = time.month.toString().padLeft(2, '0');
-    return '$day/$month  $hour:$minute';
-  }
-}
-
-class _DateDivider extends StatelessWidget {
-  const _DateDivider({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Row(
-      children: [
-        const Expanded(child: Divider(color: Color(0xFFD9DEE6))),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xD9FFFFFF),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF716A78),
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFD9DEE6))),
-      ],
-    ),
-  );
-}
-
-class _PetQuickAction extends StatelessWidget {
-  const _PetQuickAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFFFF0F5),
-      borderRadius: BorderRadius.circular(19),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(19),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: const Color(0xFFFF7196), size: 22),
-              const SizedBox(height: 5),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF5A4A5E),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PetInviteBanner extends StatelessWidget {
-  const _PetInviteBanner({
-    required this.invite,
-    required this.mine,
-    required this.onAccept,
-    required this.onReject,
-  });
-
-  final PetInvite invite;
-  final bool mine;
-  final VoidCallback onAccept;
-  final VoidCallback onReject;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 2),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFEDF4), Color(0xFFF2ECFF)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE6D8EF)),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 21,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.pets_rounded, color: Color(0xFF9B6CC5)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mine
-                      ? 'Pet invite sent'
-                      : '${invite.senderName} invited you to raise a pet',
-                  style: const TextStyle(
-                    color: Color(0xFF4B3B53),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Pet name: ${invite.petName}',
-                  style: const TextStyle(
-                    color: Color(0xFF837589),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!mine) ...[
-            IconButton(
-              onPressed: onReject,
-              tooltip: 'Decline',
-              icon: const Icon(Icons.close_rounded, color: Color(0xFF9B7C8C)),
-            ),
-            FilledButton(
-              onPressed: onAccept,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF9B6CC5),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: const Text('Accept'),
-            ),
-          ] else
-            const Padding(
-              padding: EdgeInsets.only(right: 4),
-              child: Icon(
-                Icons.schedule_rounded,
-                color: Color(0xFF9B7C8C),
-                size: 20,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageDetailRow extends StatelessWidget {
-  const _MessageDetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
-      children: [
-        Icon(icon, size: 21, color: const Color(0xFF7653A5)),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 62,
-          child: Text(label, style: const TextStyle(color: Color(0xFF716A78))),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _SelectionToolbar extends StatelessWidget {
-  const _SelectionToolbar({
-    required this.count,
-    required this.hasSelection,
-    required this.hasTextSelection,
-    required this.onClose,
-    required this.onSelectAll,
-    required this.onReply,
-    required this.onCopy,
-    required this.onCopyWithTime,
-    required this.onSave,
-    required this.onPin,
-    required this.onForward,
-    required this.onDelete,
-  });
-
-  final int count;
-  final bool hasSelection;
-  final bool hasTextSelection;
-  final VoidCallback onClose;
-  final VoidCallback onSelectAll;
-  final VoidCallback onReply;
-  final VoidCallback onCopy;
-  final VoidCallback onCopyWithTime;
-  final VoidCallback onSave;
-  final VoidCallback onPin;
-  final VoidCallback onForward;
-  final VoidCallback onDelete;
-
-  void _runMoreAction(String action) {
-    switch (action) {
-      case 'copy':
-        onCopy();
-      case 'copyTime':
-        onCopyWithTime();
-      case 'pin':
-        onPin();
-    }
-  }
-
-  Widget _action({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-    Color? color,
-  }) {
-    final enabled = onPressed != null;
-    final foreground = enabled
-        ? (color ?? const Color(0xFF514A58))
-        : const Color(0xFFB8B1BC);
-
-    return SizedBox(
-      width: 54,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 5),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 22, color: foreground),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
-                  color: foreground,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE5DFEA))),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            tooltip: 'Close selection',
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded),
-          ),
-          SizedBox(
-            width: 28,
-            child: Text(
-              '$count',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-            ),
-          ),
-          const Spacer(),
-          _action(
-            icon: Icons.reply_rounded,
-            label: 'Reply',
-            onPressed: count == 1 ? onReply : null,
-          ),
-          _action(
-            icon: Icons.forward_rounded,
-            label: 'Forward',
-            onPressed: hasSelection ? onForward : null,
-          ),
-          _action(
-            icon: Icons.bookmark_add_outlined,
-            label: 'Save',
-            onPressed: hasSelection ? onSave : null,
-          ),
-          _action(
-            icon: Icons.delete_outline_rounded,
-            label: 'Delete',
-            onPressed: hasSelection ? onDelete : null,
-            color: const Color(0xFFB14E68),
-          ),
-          SizedBox(
-            width: 54,
-            child: PopupMenuButton<String>(
-              tooltip: 'More actions',
-              enabled: hasSelection,
-              onSelected: _runMoreAction,
-              padding: EdgeInsets.zero,
-              itemBuilder: (context) => [
-                if (hasTextSelection)
-                  const PopupMenuItem(
-                    value: 'copy',
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(Icons.copy_rounded),
-                      title: Text('Copy text'),
-                    ),
-                  ),
-                if (hasTextSelection)
-                  const PopupMenuItem(
-                    value: 'copyTime',
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(Icons.content_paste_search_rounded),
-                      title: Text('Copy with time'),
-                    ),
-                  ),
-                const PopupMenuItem(
-                  value: 'pin',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.push_pin_outlined),
-                    title: Text('Pin'),
-                  ),
-                ),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.more_horiz_rounded,
-                      size: 22,
-                      color: hasSelection
-                          ? const Color(0xFF514A58)
-                          : const Color(0xFFB8B1BC),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'More',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                        color: hasSelection
-                            ? const Color(0xFF514A58)
-                            : const Color(0xFFB8B1BC),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
 }
