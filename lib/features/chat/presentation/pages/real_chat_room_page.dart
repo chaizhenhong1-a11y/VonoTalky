@@ -902,681 +902,744 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                     ),
                   ),
                   Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        final messagesState = context
-                            .watch<ChatMessagesBloc>()
-                            .state;
-                        final docs = messagesState.messages;
-                        final newMessageIds = messagesState.newMessageIds;
-                        if (messagesState.loadingInitial && docs.isEmpty) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-                        if (docs.isEmpty) {
-                          return Center(
-                            child: Text('Say hello to ${widget.user.name}'),
-                          );
-                        }
-                        return ListView.builder(
-                          controller: messageScrollController,
-                          reverse: true,
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                          itemCount:
-                              docs.length +
-                              (loadingOlderMessages ||
-                                      (!hasMoreOlderMessages &&
-                                          olderMessages.isNotEmpty)
-                                  ? 1
-                                  : 0),
-                          itemBuilder: (_, i) {
-                            if (i >= docs.length) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                child: Center(
-                                  child: loadingOlderMessages
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Beginning of conversation',
-                                          style: TextStyle(
-                                            color: Color(0xFF9A919E),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                ),
-                              );
-                            }
-
-                            final doc = docs[i];
-                            final data = doc.data();
-                            final mine = data['senderId'] == service.myId;
-                            final deleted = data['isDeleted'] as bool? ?? false;
-                            final sentAt = (data['sentAt'] as Timestamp?)
-                                ?.toDate();
-                            final read = data['readAt'] != null;
-                            final replyData = data['replyTo'];
-                            final reply = replyData is Map
-                                ? MessageReply.fromMap(
-                                    Map<String, dynamic>.from(replyData),
-                                  )
-                                : null;
-                            final reactions = Map<String, dynamic>.from(
-                              data['reactions'] as Map? ?? const {},
-                            );
-                            final selected = selectedMessageIds.contains(
-                              doc.id,
-                            );
-                            final highlighted = highlightedMessageId == doc.id;
-                            final olderSentAt = i == docs.length - 1
-                                ? null
-                                : (docs[i + 1].data()['sentAt'] as Timestamp?)
-                                      ?.toDate();
-                            final showDate =
-                                i == docs.length - 1 ||
-                                !_isSameDay(sentAt, olderSentAt);
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (showDate)
-                                  _DateDivider(label: _dateLabel(sentAt)),
-                                TweenAnimationBuilder<double>(
-                                  key: ValueKey('entry-${doc.id}'),
-                                  tween: Tween<double>(
-                                    begin: newMessageIds.contains(doc.id)
-                                        ? 0
-                                        : 1,
-                                    end: 1,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Builder(
+                            builder: (context) {
+                              final messagesState = context
+                                  .watch<ChatMessagesBloc>()
+                                  .state;
+                              final docs = messagesState.messages;
+                              final newMessageIds = messagesState.newMessageIds;
+                              if (messagesState.loadingInitial &&
+                                  docs.isEmpty) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              if (docs.isEmpty) {
+                                return Center(
+                                  child: Text(
+                                    'Say hello to ${widget.user.name}',
                                   ),
-                                  duration: const Duration(milliseconds: 280),
-                                  curve: Curves.easeOutCubic,
-                                  child: Dismissible(
-                                    key: ValueKey('swipe-${doc.id}'),
-                                    direction: deleted || selectionMode
-                                        ? DismissDirection.none
-                                        : DismissDirection.endToStart,
-                                    confirmDismiss: (_) async {
-                                      _replyToMessage(doc.id, data, mine);
-                                      return false;
-                                    },
-                                    background: const SizedBox.shrink(),
-                                    secondaryBackground: const Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Padding(
-                                        padding: EdgeInsets.only(
-                                          right: 12,
-                                          bottom: 10,
-                                        ),
-                                        child: CircleAvatar(
-                                          radius: 19,
-                                          backgroundColor: Color(0xFFE0D3F3),
-                                          child: Icon(
-                                            Icons.reply_rounded,
-                                            color: Color(0xFF7653A5),
-                                          ),
-                                        ),
+                                );
+                              }
+                              return ListView.builder(
+                                controller: messageScrollController,
+                                reverse: true,
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  14,
+                                  16,
+                                  10,
+                                ),
+                                itemCount:
+                                    docs.length +
+                                    (loadingOlderMessages ||
+                                            (!hasMoreOlderMessages &&
+                                                olderMessages.isNotEmpty)
+                                        ? 1
+                                        : 0),
+                                itemBuilder: (_, i) {
+                                  if (i >= docs.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
                                       ),
-                                    ),
-                                    child: GestureDetector(
-                                      onTap: !selectionMode
-                                          ? null
-                                          : () => _toggleSelection(doc.id),
-                                      onDoubleTap: deleted || selectionMode
-                                          ? null
-                                          : () => _quickHeart(doc.id),
-                                      onLongPress: deleted
-                                          ? null
-                                          : selectionMode
-                                          ? () => _toggleSelection(doc.id)
-                                          : () => _showActions(
-                                              doc.id,
-                                              data,
-                                              mine,
-                                            ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          if (selectionMode) ...[
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                right: 10,
-                                                bottom: 18,
-                                              ),
-                                              child: InkWell(
-                                                onTap: () =>
-                                                    _toggleSelection(doc.id),
-                                                customBorder:
-                                                    const CircleBorder(),
-                                                child: AnimatedContainer(
-                                                  duration: const Duration(
-                                                    milliseconds: 160,
-                                                  ),
-                                                  width: 24,
-                                                  height: 24,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    color: selected
-                                                        ? const Color(
-                                                            0xFF7653A5,
-                                                          )
-                                                        : Colors.transparent,
-                                                    border: Border.all(
-                                                      color: selected
-                                                          ? const Color(
-                                                              0xFF7653A5,
-                                                            )
-                                                          : const Color(
-                                                              0xFF9B93A0,
-                                                            ),
-                                                      width: 2,
+                                      child: Center(
+                                        child: loadingOlderMessages
+                                            ? const SizedBox(
+                                                width: 22,
+                                                height: 22,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
                                                     ),
-                                                  ),
-                                                  child: selected
-                                                      ? const Icon(
-                                                          Icons.check_rounded,
-                                                          size: 17,
-                                                          color: Colors.white,
-                                                        )
-                                                      : null,
+                                              )
+                                            : const Text(
+                                                'Beginning of conversation',
+                                                style: TextStyle(
+                                                  color: Color(0xFF9A919E),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                      ),
+                                    );
+                                  }
+
+                                  final doc = docs[i];
+                                  final data = doc.data();
+                                  final mine = data['senderId'] == service.myId;
+                                  final deleted =
+                                      data['isDeleted'] as bool? ?? false;
+                                  final sentAt = (data['sentAt'] as Timestamp?)
+                                      ?.toDate();
+                                  final read = data['readAt'] != null;
+                                  final replyData = data['replyTo'];
+                                  final reply = replyData is Map
+                                      ? MessageReply.fromMap(
+                                          Map<String, dynamic>.from(replyData),
+                                        )
+                                      : null;
+                                  final reactions = Map<String, dynamic>.from(
+                                    data['reactions'] as Map? ?? const {},
+                                  );
+                                  final selected = selectedMessageIds.contains(
+                                    doc.id,
+                                  );
+                                  final highlighted =
+                                      highlightedMessageId == doc.id;
+                                  final olderSentAt = i == docs.length - 1
+                                      ? null
+                                      : (docs[i + 1].data()['sentAt']
+                                                as Timestamp?)
+                                            ?.toDate();
+                                  final showDate =
+                                      i == docs.length - 1 ||
+                                      !_isSameDay(sentAt, olderSentAt);
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (showDate)
+                                        _DateDivider(label: _dateLabel(sentAt)),
+                                      TweenAnimationBuilder<double>(
+                                        key: ValueKey('entry-${doc.id}'),
+                                        tween: Tween<double>(
+                                          begin: newMessageIds.contains(doc.id)
+                                              ? 0
+                                              : 1,
+                                          end: 1,
+                                        ),
+                                        duration: const Duration(
+                                          milliseconds: 280,
+                                        ),
+                                        curve: Curves.easeOutCubic,
+                                        child: Dismissible(
+                                          key: ValueKey('swipe-${doc.id}'),
+                                          direction: deleted || selectionMode
+                                              ? DismissDirection.none
+                                              : DismissDirection.endToStart,
+                                          confirmDismiss: (_) async {
+                                            _replyToMessage(doc.id, data, mine);
+                                            return false;
+                                          },
+                                          background: const SizedBox.shrink(),
+                                          secondaryBackground: const Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                right: 12,
+                                                bottom: 10,
+                                              ),
+                                              child: CircleAvatar(
+                                                radius: 19,
+                                                backgroundColor: Color(
+                                                  0xFFE0D3F3,
+                                                ),
+                                                child: Icon(
+                                                  Icons.reply_rounded,
+                                                  color: Color(0xFF7653A5),
                                                 ),
                                               ),
                                             ),
-                                          ],
-                                          Expanded(
-                                            child: Stack(
+                                          ),
+                                          child: GestureDetector(
+                                            onTap: !selectionMode
+                                                ? null
+                                                : () =>
+                                                      _toggleSelection(doc.id),
+                                            onDoubleTap:
+                                                deleted || selectionMode
+                                                ? null
+                                                : () => _quickHeart(doc.id),
+                                            onLongPress: deleted
+                                                ? null
+                                                : selectionMode
+                                                ? () => _toggleSelection(doc.id)
+                                                : () => _showActions(
+                                                    doc.id,
+                                                    data,
+                                                    mine,
+                                                  ),
+                                            child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
                                               children: [
-                                                Align(
-                                                  alignment: mine
-                                                      ? Alignment.centerRight
-                                                      : Alignment.centerLeft,
-                                                  child: AnimatedContainer(
-                                                    duration: const Duration(
-                                                      milliseconds: 240,
-                                                    ),
-                                                    curve: Curves.easeOut,
-                                                    constraints: BoxConstraints(
-                                                      maxWidth:
-                                                          MediaQuery.sizeOf(
-                                                            context,
-                                                          ).width *
-                                                          0.76,
-                                                    ),
-                                                    margin:
-                                                        const EdgeInsets.only(
-                                                          bottom: 10,
-                                                        ),
+                                                if (selectionMode) ...[
+                                                  Padding(
                                                     padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 15,
-                                                          vertical: 9,
+                                                        const EdgeInsets.only(
+                                                          right: 10,
+                                                          bottom: 18,
                                                         ),
-                                                    decoration: BoxDecoration(
-                                                      color: mine
-                                                          ? const Color(
-                                                              0xFFCDBCEB,
-                                                            )
-                                                          : const Color(
-                                                              0xFFFFFCF3,
-                                                            ),
-                                                      borderRadius: BorderRadius.only(
-                                                        topLeft:
-                                                            const Radius.circular(
-                                                              17,
-                                                            ),
-                                                        topRight:
-                                                            const Radius.circular(
-                                                              17,
-                                                            ),
-                                                        bottomLeft:
-                                                            Radius.circular(
-                                                              mine ? 17 : 5,
-                                                            ),
-                                                        bottomRight:
-                                                            Radius.circular(
-                                                              mine ? 5 : 17,
-                                                            ),
-                                                      ),
-                                                      boxShadow: [
-                                                        const BoxShadow(
-                                                          color: Color(
-                                                            0x0D000000,
+                                                    child: InkWell(
+                                                      onTap: () =>
+                                                          _toggleSelection(
+                                                            doc.id,
                                                           ),
-                                                          blurRadius: 5,
-                                                          offset: Offset(0, 2),
-                                                        ),
-                                                        if (highlighted)
-                                                          const BoxShadow(
-                                                            color: Color(
-                                                              0x557653A5,
+                                                      customBorder:
+                                                          const CircleBorder(),
+                                                      child: AnimatedContainer(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 160,
                                                             ),
-                                                            blurRadius: 16,
-                                                            spreadRadius: 3,
-                                                          ),
-                                                      ],
-                                                      border: selected
-                                                          ? Border.all(
-                                                              color:
-                                                                  const Color(
+                                                        width: 24,
+                                                        height: 24,
+                                                        decoration: BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          color: selected
+                                                              ? const Color(
+                                                                  0xFF7653A5,
+                                                                )
+                                                              : Colors
+                                                                    .transparent,
+                                                          border: Border.all(
+                                                            color: selected
+                                                                ? const Color(
                                                                     0xFF7653A5,
+                                                                  )
+                                                                : const Color(
+                                                                    0xFF9B93A0,
                                                                   ),
-                                                              width: 2,
-                                                            )
-                                                          : highlighted
-                                                          ? Border.all(
-                                                              color:
-                                                                  const Color(
-                                                                    0xFF8D6BB8,
-                                                                  ),
-                                                              width: 2,
-                                                            )
-                                                          : null,
-                                                    ),
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .end,
-                                                      children: [
-                                                        if (reply != null)
-                                                          MessageReplyCard(
-                                                            reply: reply,
-                                                            onTap: () =>
-                                                                _jumpToMessage(
-                                                                  reply
-                                                                      .messageId,
-                                                                  docs,
-                                                                ),
+                                                            width: 2,
                                                           ),
-                                                        if (!deleted &&
-                                                            data['type'] ==
-                                                                'file')
-                                                          FileMessageBubble(
-                                                            name:
-                                                                data['fileName']
-                                                                    as String? ??
-                                                                'File',
-                                                            url:
-                                                                data['fileUrl']
-                                                                    as String,
-                                                            size:
-                                                                data['fileSize']
-                                                                    as int? ??
-                                                                0,
-                                                            mine: mine,
-                                                          )
-                                                        else if (!deleted &&
-                                                            data['type'] ==
-                                                                'voice')
-                                                          VoiceMessageBubble(
-                                                            url:
-                                                                data['audioUrl']
-                                                                    as String,
-                                                            durationMs:
-                                                                data['durationMs']
-                                                                    as int? ??
-                                                                0,
-                                                            mine: mine,
-                                                          )
-                                                        else if (!deleted &&
-                                                            data['type'] ==
-                                                                'image')
-                                                          GestureDetector(
-                                                            onTap: () => Navigator.push(
-                                                              context,
-                                                              MaterialPageRoute(
-                                                                builder: (_) => MediaViewerPage(
-                                                                  url:
-                                                                      data['imageUrl']
-                                                                          as String,
-                                                                  name:
-                                                                      'VonoTalky_${doc.id}.jpg',
+                                                        ),
+                                                        child: selected
+                                                            ? const Icon(
+                                                                Icons
+                                                                    .check_rounded,
+                                                                size: 17,
+                                                                color: Colors
+                                                                    .white,
+                                                              )
+                                                            : null,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                                Expanded(
+                                                  child: Stack(
+                                                    children: [
+                                                      Align(
+                                                        alignment: mine
+                                                            ? Alignment
+                                                                  .centerRight
+                                                            : Alignment
+                                                                  .centerLeft,
+                                                        child: AnimatedContainer(
+                                                          duration:
+                                                              const Duration(
+                                                                milliseconds:
+                                                                    240,
+                                                              ),
+                                                          curve: Curves.easeOut,
+                                                          constraints:
+                                                              BoxConstraints(
+                                                                maxWidth:
+                                                                    MediaQuery.sizeOf(
+                                                                      context,
+                                                                    ).width *
+                                                                    0.76,
+                                                              ),
+                                                          margin:
+                                                              const EdgeInsets.only(
+                                                                bottom: 10,
+                                                              ),
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 15,
+                                                                vertical: 9,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: mine
+                                                                ? const Color(
+                                                                    0xFFCDBCEB,
+                                                                  )
+                                                                : const Color(
+                                                                    0xFFFFFCF3,
+                                                                  ),
+                                                            borderRadius: BorderRadius.only(
+                                                              topLeft:
+                                                                  const Radius.circular(
+                                                                    17,
+                                                                  ),
+                                                              topRight:
+                                                                  const Radius.circular(
+                                                                    17,
+                                                                  ),
+                                                              bottomLeft:
+                                                                  Radius.circular(
+                                                                    mine
+                                                                        ? 17
+                                                                        : 5,
+                                                                  ),
+                                                              bottomRight:
+                                                                  Radius.circular(
+                                                                    mine
+                                                                        ? 5
+                                                                        : 17,
+                                                                  ),
+                                                            ),
+                                                            boxShadow: [
+                                                              const BoxShadow(
+                                                                color: Color(
+                                                                  0x0D000000,
+                                                                ),
+                                                                blurRadius: 5,
+                                                                offset: Offset(
+                                                                  0,
+                                                                  2,
                                                                 ),
                                                               ),
-                                                            ),
-                                                            child: ClipRRect(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    13,
+                                                              if (highlighted)
+                                                                const BoxShadow(
+                                                                  color: Color(
+                                                                    0x557653A5,
                                                                   ),
-                                                              child: Image.network(
-                                                                data['imageUrl']
-                                                                    as String,
-                                                                width: 230,
-                                                                height: 230,
-                                                                fit: BoxFit
-                                                                    .cover,
-                                                                loadingBuilder:
-                                                                    (
-                                                                      _,
-                                                                      child,
-                                                                      loading,
-                                                                    ) => loading == null
-                                                                    ? child
-                                                                    : const Center(
-                                                                        child: CircularProgressIndicator(
-                                                                          color: Color(
-                                                                            0xFFB49ADF,
-                                                                          ),
-                                                                        ),
+                                                                  blurRadius:
+                                                                      16,
+                                                                  spreadRadius:
+                                                                      3,
+                                                                ),
+                                                            ],
+                                                            border: selected
+                                                                ? Border.all(
+                                                                    color: const Color(
+                                                                      0xFF7653A5,
+                                                                    ),
+                                                                    width: 2,
+                                                                  )
+                                                                : highlighted
+                                                                ? Border.all(
+                                                                    color: const Color(
+                                                                      0xFF8D6BB8,
+                                                                    ),
+                                                                    width: 2,
+                                                                  )
+                                                                : null,
+                                                          ),
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .end,
+                                                            children: [
+                                                              if (reply != null)
+                                                                MessageReplyCard(
+                                                                  reply: reply,
+                                                                  onTap: () =>
+                                                                      _jumpToMessage(
+                                                                        reply
+                                                                            .messageId,
+                                                                        docs,
                                                                       ),
-                                                                errorBuilder:
-                                                                    (
-                                                                      _,
-                                                                      _,
-                                                                      _,
-                                                                    ) => const SizedBox(
+                                                                ),
+                                                              if (!deleted &&
+                                                                  data['type'] ==
+                                                                      'file')
+                                                                FileMessageBubble(
+                                                                  name:
+                                                                      data['fileName']
+                                                                          as String? ??
+                                                                      'File',
+                                                                  url:
+                                                                      data['fileUrl']
+                                                                          as String,
+                                                                  size:
+                                                                      data['fileSize']
+                                                                          as int? ??
+                                                                      0,
+                                                                  mine: mine,
+                                                                )
+                                                              else if (!deleted &&
+                                                                  data['type'] ==
+                                                                      'voice')
+                                                                VoiceMessageBubble(
+                                                                  url:
+                                                                      data['audioUrl']
+                                                                          as String,
+                                                                  durationMs:
+                                                                      data['durationMs']
+                                                                          as int? ??
+                                                                      0,
+                                                                  mine: mine,
+                                                                )
+                                                              else if (!deleted &&
+                                                                  data['type'] ==
+                                                                      'image')
+                                                                GestureDetector(
+                                                                  onTap: () => Navigator.push(
+                                                                    context,
+                                                                    MaterialPageRoute(
+                                                                      builder: (_) => MediaViewerPage(
+                                                                        url:
+                                                                            data['imageUrl']
+                                                                                as String,
+                                                                        name:
+                                                                            'VonoTalky_${doc.id}.jpg',
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  child: ClipRRect(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          13,
+                                                                        ),
+                                                                    child: Image.network(
+                                                                      data['imageUrl']
+                                                                          as String,
                                                                       width:
                                                                           230,
                                                                       height:
                                                                           230,
-                                                                      child: Center(
-                                                                        child: Icon(
-                                                                          Icons
-                                                                              .broken_image_outlined,
-                                                                          size:
-                                                                              42,
+                                                                      fit: BoxFit
+                                                                          .cover,
+                                                                      loadingBuilder:
+                                                                          (
+                                                                            _,
+                                                                            child,
+                                                                            loading,
+                                                                          ) =>
+                                                                              loading ==
+                                                                                  null
+                                                                              ? child
+                                                                              : const Center(
+                                                                                  child: CircularProgressIndicator(
+                                                                                    color: Color(
+                                                                                      0xFFB49ADF,
+                                                                                    ),
+                                                                                  ),
+                                                                                ),
+                                                                      errorBuilder: (_, _, _) => const SizedBox(
+                                                                        width:
+                                                                            230,
+                                                                        height:
+                                                                            230,
+                                                                        child: Center(
+                                                                          child: Icon(
+                                                                            Icons.broken_image_outlined,
+                                                                            size:
+                                                                                42,
+                                                                          ),
                                                                         ),
                                                                       ),
                                                                     ),
-                                                              ),
-                                                            ),
-                                                          )
-                                                        else
-                                                          Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              Text(
-                                                                deleted
-                                                                    ? 'This message was recalled'
-                                                                    : data['text']
-                                                                              as String? ??
-                                                                          '',
-                                                                style: TextStyle(
-                                                                  color: const Color(
-                                                                    0xFF24202A,
                                                                   ),
-                                                                  fontStyle:
+                                                                )
+                                                              else
+                                                                Column(
+                                                                  crossAxisAlignment:
+                                                                      CrossAxisAlignment
+                                                                          .start,
+                                                                  children: [
+                                                                    Text(
                                                                       deleted
-                                                                      ? FontStyle
-                                                                            .italic
-                                                                      : FontStyle
-                                                                            .normal,
+                                                                          ? 'This message was recalled'
+                                                                          : data['text']
+                                                                                    as String? ??
+                                                                                '',
+                                                                      style: TextStyle(
+                                                                        color: const Color(
+                                                                          0xFF24202A,
+                                                                        ),
+                                                                        fontStyle:
+                                                                            deleted
+                                                                            ? FontStyle.italic
+                                                                            : FontStyle.normal,
+                                                                      ),
+                                                                    ),
+                                                                    if (!deleted &&
+                                                                        _firstUrl(
+                                                                              data['text']
+                                                                                      as String? ??
+                                                                                  '',
+                                                                            ) !=
+                                                                            null) ...[
+                                                                      const SizedBox(
+                                                                        height:
+                                                                            8,
+                                                                      ),
+                                                                      _LinkPreviewButton(
+                                                                        url: _firstUrl(
+                                                                          data['text']
+                                                                                  as String? ??
+                                                                              '',
+                                                                        )!,
+                                                                        onTap:
+                                                                            _openLink,
+                                                                      ),
+                                                                    ],
+                                                                  ],
+                                                                ),
+                                                              const SizedBox(
+                                                                height: 3,
+                                                              ),
+                                                              Tooltip(
+                                                                message:
+                                                                    'Message details',
+                                                                child: InkWell(
+                                                                  onTap: () =>
+                                                                      _showMessageDetails(
+                                                                        data,
+                                                                        mine,
+                                                                      ),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        10,
+                                                                      ),
+                                                                  child: Padding(
+                                                                    padding: const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          3,
+                                                                      vertical:
+                                                                          2,
+                                                                    ),
+                                                                    child: Row(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        Text(
+                                                                          sentAt ==
+                                                                                  null
+                                                                              ? 'SendingÃ¢â‚¬Â¦'
+                                                                              : _messageTime(
+                                                                                  sentAt,
+                                                                                ),
+                                                                          style: const TextStyle(
+                                                                            fontSize:
+                                                                                10,
+                                                                            color: Color(
+                                                                              0xFF716A78,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                        if (data['editedAt'] !=
+                                                                            null) ...[
+                                                                          const SizedBox(
+                                                                            width:
+                                                                                4,
+                                                                          ),
+                                                                          const Text(
+                                                                            'edited',
+                                                                            style: TextStyle(
+                                                                              fontSize: 9,
+                                                                              color: Color(
+                                                                                0xFF716A78,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ],
+                                                                        if (mine) ...[
+                                                                          const SizedBox(
+                                                                            width:
+                                                                                4,
+                                                                          ),
+                                                                          Icon(
+                                                                            sentAt ==
+                                                                                    null
+                                                                                ? Icons.schedule_rounded
+                                                                                : read
+                                                                                ? Icons.done_all_rounded
+                                                                                : Icons.done_rounded,
+                                                                            size:
+                                                                                14,
+                                                                            color:
+                                                                                sentAt ==
+                                                                                    null
+                                                                                ? const Color(
+                                                                                    0xFF8C8296,
+                                                                                  )
+                                                                                : read
+                                                                                ? const Color(
+                                                                                    0xFF7150A1,
+                                                                                  )
+                                                                                : const Color(
+                                                                                    0xFF8C8296,
+                                                                                  ),
+                                                                          ),
+                                                                        ],
+                                                                      ],
+                                                                    ),
+                                                                  ),
                                                                 ),
                                                               ),
-                                                              if (!deleted &&
-                                                                  _firstUrl(
-                                                                        data['text']
-                                                                                as String? ??
-                                                                            '',
-                                                                      ) !=
-                                                                      null) ...[
+                                                              if (reactions
+                                                                  .isNotEmpty) ...[
                                                                 const SizedBox(
-                                                                  height: 8,
+                                                                  height: 5,
                                                                 ),
-                                                                _LinkPreviewButton(
-                                                                  url: _firstUrl(
-                                                                    data['text']
-                                                                            as String? ??
-                                                                        '',
-                                                                  )!,
-                                                                  onTap:
-                                                                      _openLink,
+                                                                Wrap(
+                                                                  spacing: 5,
+                                                                  runSpacing: 4,
+                                                                  children: reactions.entries.map((
+                                                                    entry,
+                                                                  ) {
+                                                                    final users =
+                                                                        List<
+                                                                          String
+                                                                        >.from(
+                                                                          entry.value
+                                                                                  as List? ??
+                                                                              const [],
+                                                                        );
+                                                                    final mine =
+                                                                        users.contains(
+                                                                          service
+                                                                              .myId,
+                                                                        );
+                                                                    return InkWell(
+                                                                      onTap: () => service.toggleReaction(
+                                                                        widget
+                                                                            .user
+                                                                            .uid,
+                                                                        doc.id,
+                                                                        entry
+                                                                            .key,
+                                                                      ),
+                                                                      onLongPress:
+                                                                          () => _showReactionDetails(
+                                                                            entry.key,
+                                                                            users,
+                                                                          ),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            14,
+                                                                          ),
+                                                                      child: Container(
+                                                                        padding: const EdgeInsets.symmetric(
+                                                                          horizontal:
+                                                                              7,
+                                                                          vertical:
+                                                                              3,
+                                                                        ),
+                                                                        decoration: BoxDecoration(
+                                                                          color:
+                                                                              mine
+                                                                              ? const Color(
+                                                                                  0xFFE2D4F5,
+                                                                                )
+                                                                              : const Color(
+                                                                                  0xFFF4EFF8,
+                                                                                ),
+                                                                          borderRadius: BorderRadius.circular(
+                                                                            14,
+                                                                          ),
+                                                                        ),
+                                                                        child: Text(
+                                                                          '${entry.key} ${users.length}',
+                                                                        ),
+                                                                      ),
+                                                                    );
+                                                                  }).toList(),
                                                                 ),
                                                               ],
                                                             ],
                                                           ),
-                                                        const SizedBox(
-                                                          height: 3,
-                                                        ),
-                                                        Tooltip(
-                                                          message:
-                                                              'Message details',
-                                                          child: InkWell(
-                                                            onTap: () =>
-                                                                _showMessageDetails(
-                                                                  data,
-                                                                  mine,
-                                                                ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  10,
-                                                                ),
-                                                            child: Padding(
-                                                              padding:
-                                                                  const EdgeInsets.symmetric(
-                                                                    horizontal:
-                                                                        3,
-                                                                    vertical: 2,
-                                                                  ),
-                                                              child: Row(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .min,
-                                                                children: [
-                                                                  Text(
-                                                                    sentAt ==
-                                                                            null
-                                                                        ? 'SendingÃ¢â‚¬Â¦'
-                                                                        : _messageTime(
-                                                                            sentAt,
-                                                                          ),
-                                                                    style: const TextStyle(
-                                                                      fontSize:
-                                                                          10,
-                                                                      color: Color(
-                                                                        0xFF716A78,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                  if (data['editedAt'] !=
-                                                                      null) ...[
-                                                                    const SizedBox(
-                                                                      width: 4,
-                                                                    ),
-                                                                    const Text(
-                                                                      'edited',
-                                                                      style: TextStyle(
-                                                                        fontSize:
-                                                                            9,
-                                                                        color: Color(
-                                                                          0xFF716A78,
-                                                                        ),
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                  if (mine) ...[
-                                                                    const SizedBox(
-                                                                      width: 4,
-                                                                    ),
-                                                                    Icon(
-                                                                      sentAt ==
-                                                                              null
-                                                                          ? Icons.schedule_rounded
-                                                                          : read
-                                                                          ? Icons.done_all_rounded
-                                                                          : Icons.done_rounded,
-                                                                      size: 14,
-                                                                      color:
-                                                                          sentAt ==
-                                                                              null
-                                                                          ? const Color(
-                                                                              0xFF8C8296,
-                                                                            )
-                                                                          : read
-                                                                          ? const Color(
-                                                                              0xFF7150A1,
-                                                                            )
-                                                                          : const Color(
-                                                                              0xFF8C8296,
-                                                                            ),
-                                                                    ),
-                                                                  ],
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        if (reactions
-                                                            .isNotEmpty) ...[
-                                                          const SizedBox(
-                                                            height: 5,
-                                                          ),
-                                                          Wrap(
-                                                            spacing: 5,
-                                                            runSpacing: 4,
-                                                            children: reactions.entries.map((
-                                                              entry,
-                                                            ) {
-                                                              final users =
-                                                                  List<
-                                                                    String
-                                                                  >.from(
-                                                                    entry.value
-                                                                            as List? ??
-                                                                        const [],
-                                                                  );
-                                                              final mine = users
-                                                                  .contains(
-                                                                    service
-                                                                        .myId,
-                                                                  );
-                                                              return InkWell(
-                                                                onTap: () => service
-                                                                    .toggleReaction(
-                                                                      widget
-                                                                          .user
-                                                                          .uid,
-                                                                      doc.id,
-                                                                      entry.key,
-                                                                    ),
-                                                                onLongPress: () =>
-                                                                    _showReactionDetails(
-                                                                      entry.key,
-                                                                      users,
-                                                                    ),
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      14,
-                                                                    ),
-                                                                child: Container(
-                                                                  padding:
-                                                                      const EdgeInsets.symmetric(
-                                                                        horizontal:
-                                                                            7,
-                                                                        vertical:
-                                                                            3,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    color: mine
-                                                                        ? const Color(
-                                                                            0xFFE2D4F5,
-                                                                          )
-                                                                        : const Color(
-                                                                            0xFFF4EFF8,
-                                                                          ),
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                          14,
-                                                                        ),
-                                                                  ),
-                                                                  child: Text(
-                                                                    '${entry.key} ${users.length}',
-                                                                  ),
-                                                                ),
-                                                              );
-                                                            }).toList(),
-                                                          ),
-                                                        ],
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (heartAnimations.contains(
-                                                  doc.id,
-                                                ))
-                                                  Positioned.fill(
-                                                    child: IgnorePointer(
-                                                      child: Center(
-                                                        child: TweenAnimationBuilder<double>(
-                                                          key: ValueKey(
-                                                            'heart-${doc.id}',
-                                                          ),
-                                                          tween: Tween(
-                                                            begin: 0.35,
-                                                            end: 1.25,
-                                                          ),
-                                                          duration:
-                                                              const Duration(
-                                                                milliseconds:
-                                                                    430,
-                                                              ),
-                                                          curve:
-                                                              Curves.elasticOut,
-                                                          builder:
-                                                              (
-                                                                _,
-                                                                scale,
-                                                                child,
-                                                              ) =>
-                                                                  Transform.scale(
-                                                                    scale:
-                                                                        scale,
-                                                                    child:
-                                                                        child,
-                                                                  ),
-                                                          child: const Text(
-                                                            'Ã¢ÂÂ¤Ã¯Â¸Â',
-                                                            style: TextStyle(
-                                                              fontSize: 42,
-                                                              shadows: [
-                                                                Shadow(
-                                                                  color: Color(
-                                                                    0x33000000,
-                                                                  ),
-                                                                  blurRadius: 8,
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          ),
                                                         ),
                                                       ),
-                                                    ),
+                                                      if (heartAnimations
+                                                          .contains(doc.id))
+                                                        Positioned.fill(
+                                                          child: IgnorePointer(
+                                                            child: Center(
+                                                              child: TweenAnimationBuilder<double>(
+                                                                key: ValueKey(
+                                                                  'heart-${doc.id}',
+                                                                ),
+                                                                tween: Tween(
+                                                                  begin: 0.35,
+                                                                  end: 1.25,
+                                                                ),
+                                                                duration:
+                                                                    const Duration(
+                                                                      milliseconds:
+                                                                          430,
+                                                                    ),
+                                                                curve: Curves
+                                                                    .elasticOut,
+                                                                builder:
+                                                                    (
+                                                                      _,
+                                                                      scale,
+                                                                      child,
+                                                                    ) => Transform.scale(
+                                                                      scale:
+                                                                          scale,
+                                                                      child:
+                                                                          child,
+                                                                    ),
+                                                                child: const Text(
+                                                                  'Ã¢ÂÂ¤Ã¯Â¸Â',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        42,
+                                                                    shadows: [
+                                                                      Shadow(
+                                                                        color: Color(
+                                                                          0x33000000,
+                                                                        ),
+                                                                        blurRadius:
+                                                                            8,
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                    ],
                                                   ),
+                                                ),
                                               ],
                                             ),
                                           ),
-                                        ],
+                                        ),
+                                        builder: (_, value, child) => Opacity(
+                                          opacity: value,
+                                          child: Transform.translate(
+                                            offset: Offset(0, (1 - value) * 14),
+                                            child: child,
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  builder: (_, value, child) => Opacity(
-                                    opacity: value,
-                                    child: Transform.translate(
-                                      offset: Offset(0, (1 - value) * 14),
-                                      child: child,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        if (!selectionMode)
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: _ChatBackgroundSwitcher(
+                              otherName: widget.user.name,
+                              viewMode: _backgroundState.viewMode,
+                              otherAvailable: _backgroundState.otherAvailable,
+                              onToggle: () {
+                                final cubit = context
+                                    .read<ChatBackgroundCubit>();
+
+                                if (cubit.state.viewMode ==
+                                    ChatBackgroundViewMode.mine) {
+                                  cubit.showOther();
+                                } else {
+                                  cubit.showMine();
+                                }
+                              },
+                            ),
+                          ),
+                      ],
                     ),
-                  ),
+                  ), //這裏加
                   if (!selectionMode)
                     SafeArea(
                       top: false,
