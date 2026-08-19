@@ -35,7 +35,7 @@ import 'forward_message_page.dart';
 import 'media_viewer_page.dart';
 import 'saved_messages_page.dart';
 import 'shared_media_page.dart';
-
+import 'chat_background_page.dart';
 class RealChatRoomPage extends StatefulWidget {
   const RealChatRoomPage({super.key, required this.user});
   final ChatUser user;
@@ -2387,8 +2387,10 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
           final muted = snapshot.data?['muted'] as bool? ?? false;
           final pinned = snapshot.data?['pinned'] as bool? ?? false;
           return SafeArea(
-            child: Wrap(
-              children: [
+  child: SingleChildScrollView(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
                 ListTile(
                   leading: const Icon(Icons.person_rounded),
                   title: const Text('Contact info'),
@@ -2505,23 +2507,48 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.palette_outlined),
-                  title: const Text('Chat background'),
-                  subtitle: const Text('Choose a color for this conversation'),
-                  trailing: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: _chatBackgroundColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFD5CFDA)),
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showBackgroundPicker();
-                  },
-                ),
+  leading: const Icon(
+    Icons.wallpaper_rounded,
+  ),
+  title: const Text(
+    'Chat background',
+  ),
+  subtitle: Text(
+    'Background for your chat with ${widget.user.name}',
+  ),
+  onTap: () {
+    Navigator.pop(sheetContext);
+    _openChatBackground();
+  },
+),
+ListTile(
+  leading: const Icon(
+    Icons.palette_outlined,
+  ),
+  title: const Text(
+    'Fallback color',
+  ),
+  subtitle: const Text(
+    'Used when no image background is selected',
+  ),
+  trailing: Container(
+    width: 24,
+    height: 24,
+    decoration: BoxDecoration(
+      color: _chatBackgroundColor,
+      shape: BoxShape.circle,
+      border: Border.all(
+        color: const Color(
+          0xFFD5CFDA,
+        ),
+      ),
+    ),
+  ),
+  onTap: () {
+    Navigator.pop(sheetContext);
+    _showBackgroundPicker();
+  },
+),
                 const Divider(height: 8),
                 ListTile(
                   leading: const Icon(
@@ -2540,6 +2567,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                 ),
               ],
             ),
+  ),
           );
         },
       ),
@@ -2636,6 +2664,18 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       context,
       MaterialPageRoute(
         builder: (_) => SharedMediaPage(otherId: widget.user.uid),
+      ),
+    );
+  }
+
+  void _openChatBackground() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatBackgroundPage(
+          otherId: widget.user.uid,
+          otherName: widget.user.name,
+        ),
       ),
     );
   }
