@@ -1,4 +1,4 @@
-part of '../../pages/real_chat_room_page.dart';
+part of '../../../pages/real_chat_room_page.dart';
 
 class _SelectionToolbar extends StatelessWidget {
   const _SelectionToolbar({

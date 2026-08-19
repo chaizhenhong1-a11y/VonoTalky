@@ -1,4 +1,4 @@
-part of '../../pages/real_chat_room_page.dart';
+part of '../../../pages/real_chat_room_page.dart';
 
 class _LinkPreviewButton extends StatelessWidget {
   const _LinkPreviewButton({required this.url, required this.onTap});
@@ -58,6 +58,7 @@ class _LinkPreviewButton extends StatelessWidget {
     );
   }
 }
+
 class _MessageActionButton extends StatelessWidget {
   const _MessageActionButton({
     required this.icon,
@@ -97,6 +98,7 @@ class _MessageActionButton extends StatelessWidget {
     ),
   );
 }
+
 class _OriginalMessagePreview extends StatelessWidget {
   const _OriginalMessagePreview({
     required this.data,
@@ -206,6 +208,7 @@ class _OriginalMessagePreview extends StatelessWidget {
     return '$day/$month  $hour:$minute';
   }
 }
+
 class _DateDivider extends StatelessWidget {
   const _DateDivider({required this.label});
 
@@ -238,6 +241,7 @@ class _DateDivider extends StatelessWidget {
     ),
   );
 }
+
 class _MessageDetailRow extends StatelessWidget {
   const _MessageDetailRow({
     required this.icon,

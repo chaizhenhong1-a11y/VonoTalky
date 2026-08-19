@@ -1,4 +1,4 @@
-part of '../../pages/real_chat_room_page.dart';
+part of '../../../pages/real_chat_room_page.dart';
 
 class _PetQuickAction extends StatelessWidget {
   const _PetQuickAction({
@@ -41,6 +41,7 @@ class _PetQuickAction extends StatelessWidget {
     );
   }
 }
+
 class _PetInviteBanner extends StatelessWidget {
   const _PetInviteBanner({
     required this.invite,

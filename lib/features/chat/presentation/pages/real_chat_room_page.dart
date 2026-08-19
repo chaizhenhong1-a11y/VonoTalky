@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,10 +12,17 @@ import '../../data/models/message_reply.dart';
 import '../../data/services/chat_media_service.dart';
 import '../../data/services/chat_file_service.dart';
 import '../../data/services/chat_service.dart';
-import '../../data/services/chat_background_service.dart';
 import '../../data/services/chat_voice_service.dart';
 import '../../data/services/message_management_service.dart';
 import '../../data/services/pinned_message_service.dart';
+import '../bloc/attachment/chat_attachment_cubit.dart';
+import '../bloc/background/chat_background_cubit.dart';
+import '../bloc/composer/chat_composer_cubit.dart';
+import '../bloc/messages/chat_messages_bloc.dart';
+import '../bloc/pet/chat_pet_cubit.dart';
+import '../bloc/presence/chat_presence_cubit.dart';
+import '../bloc/preferences/chat_preferences_cubit.dart';
+import '../bloc/selection/chat_selection_cubit.dart';
 import '../widgets/pinned_message_banner.dart';
 import '../widgets/voice_message_bubble.dart';
 import '../widgets/file_message_bubble.dart';
@@ -38,26 +46,57 @@ import 'saved_messages_page.dart';
 import 'shared_media_page.dart';
 import 'chat_background_page.dart';
 
-part '../widgets/chat_room/chat_background_widgets.dart';
-part '../widgets/chat_room/chat_message_widgets.dart';
-part '../widgets/chat_room/chat_attachment_widgets.dart';
-part '../widgets/chat_room/chat_pet_widgets.dart';
-part '../widgets/chat_room/chat_selection_toolbar.dart';
+part '../widgets/chat_room/background/chat_background_widgets.dart';
+part '../widgets/chat_room/message/chat_message_widgets.dart';
+part '../widgets/chat_room/attachments/chat_attachment_widgets.dart';
+part '../widgets/chat_room/pet/chat_pet_widgets.dart';
+part '../widgets/chat_room/selection/chat_selection_toolbar.dart';
 
-
-enum _ChatBackgroundViewMode {
-  mine,
-  other,
-}
-
-class RealChatRoomPage extends StatefulWidget {
+class RealChatRoomPage extends StatelessWidget {
   const RealChatRoomPage({super.key, required this.user});
+
   final ChatUser user;
+
   @override
-  State<RealChatRoomPage> createState() => _RealChatRoomPageState();
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<ChatMessagesBloc>(
+          create: (_) =>
+              ChatMessagesBloc(otherId: user.uid)
+                ..add(const ChatMessagesStarted()),
+        ),
+        BlocProvider<ChatComposerCubit>(create: (_) => ChatComposerCubit()),
+        BlocProvider<ChatSelectionCubit>(create: (_) => ChatSelectionCubit()),
+        BlocProvider<ChatAttachmentCubit>(create: (_) => ChatAttachmentCubit()),
+        BlocProvider<ChatBackgroundCubit>(
+          create: (_) => ChatBackgroundCubit(otherId: user.uid)..start(),
+        ),
+        BlocProvider<ChatPetCubit>(
+          create: (_) => ChatPetCubit(otherId: user.uid)..start(),
+        ),
+        BlocProvider<ChatPresenceCubit>(
+          create: (_) => ChatPresenceCubit(otherId: user.uid)..start(),
+        ),
+        BlocProvider<ChatPreferencesCubit>(
+          create: (_) => ChatPreferencesCubit(otherId: user.uid)..start(),
+        ),
+      ],
+      child: _RealChatRoomView(user: user),
+    );
+  }
 }
 
-class _RealChatRoomPageState extends State<RealChatRoomPage> {
+class _RealChatRoomView extends StatefulWidget {
+  const _RealChatRoomView({required this.user});
+
+  final ChatUser user;
+
+  @override
+  State<_RealChatRoomView> createState() => _RealChatRoomViewState();
+}
+
+class _RealChatRoomViewState extends State<_RealChatRoomView> {
   final controller = TextEditingController();
   final messageFocusNode = FocusNode();
   final messageScrollController = ScrollController();
@@ -67,57 +106,64 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   final voiceService = ChatVoiceService();
   final managementService = MessageManagementService();
   final contactDetailService = ContactDetailService();
-  final chatBackgroundService = ChatBackgroundService();
-  StreamSubscription<ChatBackgroundInfo>?
-      _myBackgroundSubscription;
-
-  StreamSubscription<SharedChatBackground?>?
-      _otherBackgroundSubscription;
-
-  ChatBackgroundInfo? _myBackground;
-  SharedChatBackground? _otherBackground;
-
-  _ChatBackgroundViewMode _backgroundViewMode =
-      _ChatBackgroundViewMode.mine;
   final pinnedMessageService = PinnedMessageService();
   final petInviteService = PetInviteService();
   final petChatProgressService = SharedPetChatProgressService();
   final sharedPetService = SharedPetService();
   final notificationService = PetNotificationService();
+
   late final String activeConversationId;
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> latestMessages = const [];
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> olderMessages = [];
-  bool loadingOlderMessages = false;
-  bool hasMoreOlderMessages = true;
-  String? historyJumpTargetId;
-  static const int messagePageSize = 40;
-  final Set<String> selectedMessageIds = {};
-  bool selectionMode = false;
-  final Set<String> knownMessageIds = {};
-  bool messageSnapshotInitialized = false;
   Timer? typingTimer;
   Timer? draftTimer;
   Timer? highlightTimer;
-  bool sending = false;
-  bool uploading = false;
-  bool recording = false;
-  bool voiceInputMode = false;
-  bool voiceCancelArmed = false;
   final voiceWatch = Stopwatch();
   Timer? voiceTimer;
-  int voiceSeconds = 0;
-  MessageReply? replyingTo;
-  String? failedMessageText;
-  MessageReply? failedMessageReply;
-  bool showEmojiPicker = false;
-  bool showJumpToLatest = false;
-  int newerMessagesBelow = 0;
-  final Set<String> heartAnimations = {};
-  String chatBackground = 'blue';
-  Offset floatingPetAnchor = const Offset(0.82, 0.18);
-  bool floatingPetVisible = true;
   OverlayEntry? floatingPetOverlayEntry;
-  String? highlightedMessageId;
+
+  ChatMessagesState get _messagesState =>
+      context.read<ChatMessagesBloc>().state;
+  ChatComposerState get _composerState =>
+      context.read<ChatComposerCubit>().state;
+  ChatSelectionState get _selectionState =>
+      context.read<ChatSelectionCubit>().state;
+  ChatAttachmentState get _attachmentState =>
+      context.read<ChatAttachmentCubit>().state;
+  ChatBackgroundState get _backgroundState =>
+      context.read<ChatBackgroundCubit>().state;
+  ChatPetState get _petState => context.read<ChatPetCubit>().state;
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> get latestMessages =>
+      _messagesState.messages;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> get olderMessages =>
+      _messagesState.olderMessages;
+  bool get loadingOlderMessages => _messagesState.loadingOlder;
+  bool get hasMoreOlderMessages => _messagesState.hasMoreOlder;
+  String? get historyJumpTargetId => _messagesState.historyJumpTargetId;
+  bool get showJumpToLatest => _messagesState.showJumpToLatest;
+  int get newerMessagesBelow => _messagesState.newerMessagesBelow;
+  Set<String> get heartAnimations => _messagesState.heartAnimations;
+  String? get highlightedMessageId => _messagesState.highlightedMessageId;
+
+  bool get selectionMode => _selectionState.selectionMode;
+  Set<String> get selectedMessageIds => _selectionState.selectedMessageIds;
+
+  bool get sending => _composerState.sending;
+  MessageReply? get replyingTo => _composerState.replyingTo;
+  String? get failedMessageText => _composerState.failedMessageText;
+  MessageReply? get failedMessageReply => _composerState.failedMessageReply;
+  bool get showEmojiPicker => _composerState.showEmojiPicker;
+  bool get voiceInputMode => _composerState.voiceInputMode;
+
+  bool get uploading => _attachmentState.uploading;
+  bool get recording => _attachmentState.recording;
+  bool get voiceCancelArmed => _attachmentState.voiceCancelArmed;
+  int get voiceSeconds => _attachmentState.voiceSeconds;
+
+  String get chatBackground => _backgroundState.fallbackColorKey;
+  String? get _activeBackgroundImageUrl => _backgroundState.activeImageUrl;
+
+  Offset get floatingPetAnchor => _petState.anchor;
+  bool get floatingPetVisible => _petState.visible;
 
   @override
   void initState() {
@@ -125,7 +171,6 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     activeConversationId = service.roomId(widget.user.uid);
     notificationService.setActiveConversation(activeConversationId);
     service.markRead(widget.user.uid);
-    _initializeChatBackgrounds();
     controller.addListener(_typingChanged);
     messageScrollController.addListener(_handleMessageScroll);
     _restoreDraft();
@@ -134,54 +179,6 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       _installFloatingPetOverlay();
     });
   }
-
-  Future<void> _initializeChatBackgrounds() async {
-  try {
-    await service.ensureConversation(
-      widget.user.uid,
-    );
-
-    if (!mounted) return;
-
-    _myBackgroundSubscription =
-        chatBackgroundService
-            .watchMine(widget.user.uid)
-            .listen(
-      (background) {
-        if (!mounted) return;
-
-        setState(() {
-          _myBackground = background;
-        });
-      },
-    );
-
-    _otherBackgroundSubscription =
-        chatBackgroundService
-            .watchOther(widget.user.uid)
-            .listen(
-      (background) {
-        if (!mounted) return;
-
-        setState(() {
-          _otherBackground = background;
-
-          // 对方关闭分享或删除背景时，
-          // 如果我正在看他的背景，
-          // 自动退回自己的背景。
-          if (background == null &&
-              _backgroundViewMode ==
-                  _ChatBackgroundViewMode.other) {
-            _backgroundViewMode =
-                _ChatBackgroundViewMode.mine;
-          }
-        });
-      },
-    );
-  } catch (_) {
-    // 背景功能失败不能影响聊天功能。
-  }
-}
 
   Future<void> _restoreDraft() async {
     try {
@@ -196,16 +193,12 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       final savedPetVisible =
           preferences['floatingPetVisible'] as bool? ?? true;
       if (!mounted) return;
-      setState(() {
-        chatBackground = savedBackground;
-        floatingPetVisible = savedPetVisible;
-        if (savedPetX != null && savedPetY != null) {
-          floatingPetAnchor = Offset(
-            savedPetX.clamp(0.0, 1.0),
-            savedPetY.clamp(0.0, 1.0),
-          );
-        }
-      });
+      context.read<ChatBackgroundCubit>().restoreFallbackColor(savedBackground);
+      context.read<ChatPetCubit>().restore(
+        visible: savedPetVisible,
+        x: savedPetX,
+        y: savedPetY,
+      );
       floatingPetOverlayEntry?.markNeedsBuild();
       if (draft.isEmpty || controller.text.isNotEmpty) return;
       controller.value = TextEditingValue(
@@ -226,10 +219,9 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     if ((shouldShow != showJumpToLatest ||
             (!shouldShow && newerMessagesBelow != 0)) &&
         mounted) {
-      setState(() {
-        showJumpToLatest = shouldShow;
-        if (!shouldShow) newerMessagesBelow = 0;
-      });
+      context.read<ChatMessagesBloc>().add(
+        ChatMessagesViewportChanged(shouldShow),
+      );
     }
 
     // The list is reversed: offset 0 is the newest message and
@@ -247,9 +239,6 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       return;
     }
 
-    loadingOlderMessages = true;
-    if (mounted) setState(() {});
-
     final beforeMaxExtent = messageScrollController.hasClients
         ? messageScrollController.position.maxScrollExtent
         : 0.0;
@@ -257,84 +246,29 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         ? messageScrollController.position.pixels
         : 0.0;
 
-    try {
-      final allLoaded = <QueryDocumentSnapshot<Map<String, dynamic>>>[
-        ...latestMessages,
-        ...olderMessages,
-      ];
+    final completer = Completer<void>();
+    context.read<ChatMessagesBloc>().add(
+      ChatMessagesLoadOlderRequested(completer: completer),
+    );
+    await completer.future;
 
-      if (allLoaded.isEmpty) {
-        hasMoreOlderMessages = false;
-        return;
-      }
-
-      allLoaded.sort((a, b) {
-        final aTime = a.data()['sentAt'] as Timestamp?;
-        final bTime = b.data()['sentAt'] as Timestamp?;
-        if (aTime == null && bTime == null) return 0;
-        if (aTime == null) return 1;
-        if (bTime == null) return -1;
-        return bTime.compareTo(aTime);
-      });
-
-      final oldestDocument = allLoaded.last;
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection('conversations')
-          .doc(activeConversationId)
-          .collection('messages')
-          .orderBy('sentAt', descending: true)
-          .startAfterDocument(oldestDocument)
-          .limit(messagePageSize)
-          .get();
-
-      if (!mounted) return;
-
-      final existingIds = {
-        ...latestMessages.map((message) => message.id),
-        ...olderMessages.map((message) => message.id),
-      };
-
-      final additions = snapshot.docs
-          .where((document) => !existingIds.contains(document.id))
-          .toList();
-
-      setState(() {
-        olderMessages.addAll(additions);
-        if (snapshot.docs.length < messagePageSize) {
-          hasMoreOlderMessages = false;
-        }
-      });
-
-      // Keep the user's viewport anchored after older records are inserted.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !messageScrollController.hasClients) return;
-
-        final afterMaxExtent = messageScrollController.position.maxScrollExtent;
-        final addedExtent = afterMaxExtent - beforeMaxExtent;
-
-        if (addedExtent > 0) {
-          final target = (beforePixels + addedExtent).clamp(
-            messageScrollController.position.minScrollExtent,
-            messageScrollController.position.maxScrollExtent,
-          );
-          messageScrollController.jumpTo(target.toDouble());
-        }
-      });
-    } catch (_) {
-      if (mounted) {
-        _notice('Older messages could not be loaded');
-      }
-    } finally {
-      loadingOlderMessages = false;
-      if (mounted) setState(() {});
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !messageScrollController.hasClients) return;
+      final afterMaxExtent = messageScrollController.position.maxScrollExtent;
+      final addedExtent = afterMaxExtent - beforeMaxExtent;
+      if (addedExtent <= 0) return;
+      final target = (beforePixels + addedExtent).clamp(
+        messageScrollController.position.minScrollExtent,
+        messageScrollController.position.maxScrollExtent,
+      );
+      messageScrollController.jumpTo(target.toDouble());
+    });
   }
 
   Future<void> _jumpToLatest() async {
     if (!messageScrollController.hasClients) return;
     if (newerMessagesBelow != 0 && mounted) {
-      setState(() => newerMessagesBelow = 0);
+      context.read<ChatMessagesBloc>().add(const ChatMessagesNewerCleared());
     }
     await messageScrollController.animateTo(
       0,
@@ -393,26 +327,31 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   }
 
   Future<void> _quickHeart(String messageId) async {
-    setState(() => heartAnimations.add(messageId));
+    context.read<ChatMessagesBloc>().add(
+      ChatMessagesHeartChanged(messageId, true),
+    );
     Timer(const Duration(milliseconds: 650), () {
-      if (mounted) setState(() => heartAnimations.remove(messageId));
+      if (mounted) {
+        context.read<ChatMessagesBloc>().add(
+          ChatMessagesHeartChanged(messageId, false),
+        );
+      }
     });
     try {
-      await service.toggleReaction(widget.user.uid, messageId, '❤️');
+      await service.toggleReaction(widget.user.uid, messageId, 'Ã¢ÂÂ¤Ã¯Â¸Â');
     } catch (_) {
       if (mounted) _notice('Reaction could not be updated');
     }
   }
 
   void _replyToMessage(String messageId, Map<String, dynamic> data, bool mine) {
-    setState(() {
-      replyingTo = MessageReply.fromMessage(
+    context.read<ChatComposerCubit>().setReply(
+      MessageReply.fromMessage(
         messageId: messageId,
         data: data,
         senderName: mine ? 'You' : widget.user.name,
-      );
-      showEmojiPicker = false;
-    });
+      ),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       controller.selection = TextSelection.collapsed(
@@ -423,7 +362,9 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   }
 
   void _typingChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      context.read<ChatComposerCubit>().textChanged(controller.text);
+    }
     typingTimer?.cancel();
     draftTimer?.cancel();
     highlightTimer?.cancel();
@@ -438,8 +379,6 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
 
   @override
   void dispose() {
-    _myBackgroundSubscription?.cancel();
-    _otherBackgroundSubscription?.cancel();
     floatingPetOverlayEntry?.remove();
     floatingPetOverlayEntry = null;
     typingTimer?.cancel();
@@ -471,11 +410,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     final reply = replyingTo;
     controller.clear();
     messageFocusNode.requestFocus();
-    setState(() {
-      sending = true;
-      replyingTo = null;
-      showEmojiPicker = false;
-    });
+    context.read<ChatComposerCubit>().beginSending();
     try {
       await service.send(widget.user.uid, text, reply: reply);
       await _recordPetChatProgress();
@@ -486,16 +421,13 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() {
-          failedMessageText = text;
-          failedMessageReply = reply;
-        });
+        context.read<ChatComposerCubit>().setFailure(text, reply);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Message could not be sent')),
         );
       }
     } finally {
-      if (mounted) setState(() => sending = false);
+      if (mounted) context.read<ChatComposerCubit>().finishSending();
     }
   }
 
@@ -503,11 +435,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     final text = failedMessageText;
     if (text == null || sending) return;
     final reply = failedMessageReply;
-    setState(() {
-      sending = true;
-      failedMessageText = null;
-      failedMessageReply = null;
-    });
+    context.read<ChatComposerCubit>().beginSending(clearFailure: true);
     try {
       await service.send(widget.user.uid, text, reply: reply);
       await _recordPetChatProgress();
@@ -518,16 +446,13 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       });
     } catch (_) {
       if (mounted) {
-        setState(() {
-          failedMessageText = text;
-          failedMessageReply = reply;
-        });
+        context.read<ChatComposerCubit>().setFailure(text, reply);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Retry failed. Check your connection.')),
         );
       }
     } finally {
-      if (mounted) setState(() => sending = false);
+      if (mounted) context.read<ChatComposerCubit>().finishSending();
     }
   }
 
@@ -538,7 +463,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     if (closeSourceSheet) Navigator.pop(context);
     final file = await mediaService.pick(source);
     if (file == null || !mounted) return;
-    setState(() => uploading = true);
+    context.read<ChatAttachmentCubit>().setUploading(true);
     try {
       await service.ensureConversation(widget.user.uid);
       final uploaded = await mediaService.upload(
@@ -553,7 +478,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         reply: replyingTo,
       );
       await _recordPetChatProgress();
-      if (mounted) setState(() => replyingTo = null);
+      if (mounted) context.read<ChatComposerCubit>().clearReply();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -561,29 +486,25 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         ).showSnackBar(const SnackBar(content: Text('Image upload failed')));
       }
     } finally {
-      if (mounted) setState(() => uploading = false);
+      if (mounted) context.read<ChatAttachmentCubit>().setUploading(false);
     }
   }
 
   void _toggleVoiceInputMode() {
     if (recording || uploading || sending) return;
     if (voiceInputMode) {
-      setState(() {
-        voiceInputMode = false;
-        voiceCancelArmed = false;
-        showEmojiPicker = false;
-      });
+      context.read<ChatComposerCubit>().setVoiceInputMode(false);
+      context.read<ChatAttachmentCubit>().setVoiceCancelArmed(false);
+      context.read<ChatComposerCubit>().setEmojiPicker(false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         messageFocusNode.requestFocus();
       });
     } else {
       messageFocusNode.unfocus();
-      setState(() {
-        voiceInputMode = true;
-        voiceCancelArmed = false;
-        showEmojiPicker = false;
-      });
+      context.read<ChatComposerCubit>().setVoiceInputMode(true);
+      context.read<ChatAttachmentCubit>().setVoiceCancelArmed(false);
+      context.read<ChatComposerCubit>().setEmojiPicker(false);
     }
   }
 
@@ -597,7 +518,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     if (!recording) return;
     final shouldCancel = details.offsetFromOrigin.dy < -60;
     if (shouldCancel != voiceCancelArmed && mounted) {
-      setState(() => voiceCancelArmed = shouldCancel);
+      context.read<ChatAttachmentCubit>().setVoiceCancelArmed(shouldCancel);
       HapticFeedback.selectionClick();
     }
   }
@@ -610,7 +531,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     } else {
       await _sendRecording();
     }
-    if (mounted) setState(() => voiceCancelArmed = false);
+    if (mounted) context.read<ChatAttachmentCubit>().setVoiceCancelArmed(false);
   }
 
   Widget _voiceHoldButton() => Expanded(
@@ -640,7 +561,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
           voiceCancelArmed
               ? 'Release to cancel'
               : recording
-              ? 'Release to send · Slide up to cancel'
+              ? 'Release to send Ã‚Â· Slide up to cancel'
               : 'Hold to talk',
           style: TextStyle(
             color: voiceCancelArmed
@@ -668,23 +589,25 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       ..reset()
       ..start();
     voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => voiceSeconds = voiceWatch.elapsed.inSeconds);
+      if (mounted) {
+        context.read<ChatAttachmentCubit>().setVoiceSeconds(
+          voiceWatch.elapsed.inSeconds,
+        );
+      }
     });
-    setState(() {
-      recording = true;
-      voiceSeconds = 0;
-    });
+    context.read<ChatAttachmentCubit>().startRecording();
   }
 
   Future<void> _sendRecording() async {
     if (!recording) return;
     final sourcePath = await voiceService.stop();
+    if (!mounted) return;
     voiceWatch.stop();
     voiceTimer?.cancel();
     final durationMs = voiceWatch.elapsedMilliseconds;
-    if (mounted) setState(() => recording = false);
+    if (mounted) context.read<ChatAttachmentCubit>().stopRecording();
     if (sourcePath == null || durationMs < 500) return;
-    setState(() => uploading = true);
+    context.read<ChatAttachmentCubit>().setUploading(true);
     try {
       final upload = await voiceService.upload(
         sourcePath: sourcePath,
@@ -699,7 +622,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         reply: replyingTo,
       );
       await _recordPetChatProgress();
-      if (mounted) setState(() => replyingTo = null);
+      if (mounted) context.read<ChatComposerCubit>().clearReply();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -707,7 +630,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => uploading = false);
+      if (mounted) context.read<ChatAttachmentCubit>().setUploading(false);
     }
   }
 
@@ -719,10 +642,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       ..reset();
     voiceTimer?.cancel();
     if (mounted) {
-      setState(() {
-        recording = false;
-        voiceSeconds = 0;
-      });
+      context.read<ChatAttachmentCubit>().cancelRecording();
     }
   }
 
@@ -730,7 +650,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
     Navigator.pop(context);
     final file = await fileService.pick();
     if (file == null || !mounted) return;
-    setState(() => uploading = true);
+    context.read<ChatAttachmentCubit>().setUploading(true);
     try {
       await service.ensureConversation(widget.user.uid);
       final uploaded = await fileService.upload(
@@ -748,7 +668,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         reply: replyingTo,
       );
       await _recordPetChatProgress();
-      if (mounted) setState(() => replyingTo = null);
+      if (mounted) context.read<ChatComposerCubit>().clearReply();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -756,7 +676,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => uploading = false);
+      if (mounted) context.read<ChatAttachmentCubit>().setUploading(false);
     }
   }
 
@@ -766,855 +686,831 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
       return;
     }
     if (showEmojiPicker) {
-      setState(() => showEmojiPicker = false);
+      context.read<ChatComposerCubit>().setEmojiPicker(false);
       return;
     }
     if (replyingTo != null) {
-      setState(() => replyingTo = null);
+      context.read<ChatComposerCubit>().clearReply();
       messageFocusNode.requestFocus();
       return;
     }
     Navigator.pop(context);
   }
 
-  String? get _activeBackgroundImageUrl {
-  if (_backgroundViewMode ==
-      _ChatBackgroundViewMode.other) {
-    final otherUrl =
-        _otherBackground?.imageUrl;
-
-    if (otherUrl != null &&
-        otherUrl.isNotEmpty) {
-      return otherUrl;
-    }
-  }
-
-  final myUrl =
-      _myBackground?.imageUrl;
-
-  if (myUrl != null &&
-      myUrl.isNotEmpty) {
-    return myUrl;
-  }
-
-  return null;
-}
-
   @override
-  Widget build(BuildContext context) => Scaffold(
-    resizeToAvoidBottomInset: true,
-    appBar: AppBar(
-      toolbarHeight: 82,
-      backgroundColor: const Color(0xFFE9E3FA),
-      surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        onPressed: _handleBackPressed,
-        tooltip: selectionMode
-            ? 'Exit selection'
-            : showEmojiPicker
-            ? 'Close emoji picker'
-            : 'Back',
-        icon: Icon(
-          selectionMode ? Icons.close_rounded : Icons.arrow_back_rounded,
-        ),
-      ),
-      actions: selectionMode
-          ? [
-              IconButton(
-                onPressed: _selectableMessageIds.isEmpty
-                    ? null
-                    : () {
-                        final allSelected =
+  Widget build(BuildContext context) {
+    context.watch<ChatMessagesBloc>();
+    context.watch<ChatComposerCubit>();
+    context.watch<ChatSelectionCubit>();
+    context.watch<ChatAttachmentCubit>();
+    context.watch<ChatBackgroundCubit>();
+    context.watch<ChatPetCubit>();
+    context.watch<ChatPresenceCubit>();
+    context.watch<ChatPreferencesCubit>();
+
+    return BlocListener<ChatPetCubit, ChatPetState>(
+      listener: (_, _) => floatingPetOverlayEntry?.markNeedsBuild(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          toolbarHeight: 82,
+          backgroundColor: const Color(0xFFE9E3FA),
+          surfaceTintColor: Colors.transparent,
+          leading: IconButton(
+            onPressed: _handleBackPressed,
+            tooltip: selectionMode
+                ? 'Exit selection'
+                : showEmojiPicker
+                ? 'Close emoji picker'
+                : 'Back',
+            icon: Icon(
+              selectionMode ? Icons.close_rounded : Icons.arrow_back_rounded,
+            ),
+          ),
+          actions: selectionMode
+              ? [
+                  IconButton(
+                    onPressed: _selectableMessageIds.isEmpty
+                        ? null
+                        : () {
+                            final allSelected =
+                                selectedMessageIds.length ==
+                                    _selectableMessageIds.length &&
+                                selectedMessageIds.containsAll(
+                                  _selectableMessageIds,
+                                );
+                            if (allSelected) {
+                              context
+                                  .read<ChatSelectionCubit>()
+                                  .clearSelection();
+                            } else {
+                              _selectAllMessages();
+                            }
+                          },
+                    tooltip:
+                        _selectableMessageIds.isNotEmpty &&
                             selectedMessageIds.length ==
                                 _selectableMessageIds.length &&
                             selectedMessageIds.containsAll(
                               _selectableMessageIds,
-                            );
-                        if (allSelected) {
-                          setState(selectedMessageIds.clear);
-                        } else {
-                          _selectAllMessages();
-                        }
-                      },
-                tooltip:
-                    _selectableMessageIds.isNotEmpty &&
-                        selectedMessageIds.length ==
-                            _selectableMessageIds.length &&
-                        selectedMessageIds.containsAll(_selectableMessageIds)
-                    ? 'Clear selection'
-                    : 'Select all messages',
-                icon: Icon(
-                  _selectableMessageIds.isNotEmpty &&
-                          selectedMessageIds.length ==
-                              _selectableMessageIds.length &&
-                          selectedMessageIds.containsAll(_selectableMessageIds)
-                      ? Icons.deselect_rounded
-                      : Icons.select_all_rounded,
-                ),
-              ),
-            ]
-          : [
-              IconButton(
-                onPressed: _openSearch,
-                tooltip: 'Search messages',
-                icon: const Icon(Icons.search_rounded),
-              ),
-              IconButton(
-                onPressed: _openSharedMedia,
-                tooltip: 'Photos, files and voice',
-                icon: const Icon(Icons.perm_media_outlined),
-              ),
-              IconButton(
-                onPressed: _showChatMenu,
-                tooltip: 'More options',
-                icon: const Icon(Icons.more_vert_rounded),
-              ),
-            ],
-      titleSpacing: 0,
-      title: selectionMode
-          ? Text(
-              '${selectedMessageIds.length} selected',
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-            )
-          : InkWell(
-              onTap: _openContactDetails,
-              borderRadius: BorderRadius.circular(14),
-              child: Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CircleAvatar(
-                        radius: 23,
-                        backgroundColor: Colors.white,
-                        backgroundImage: widget.user.photoUrl == null
-                            ? null
-                            : NetworkImage(widget.user.photoUrl!),
-                        child: widget.user.photoUrl == null
-                            ? Text(widget.user.name[0].toUpperCase())
-                            : null,
-                      ),
-                      if (widget.user.isOnline)
-                        Positioned(
-                          right: -1,
-                          bottom: 1,
-                          child: Container(
-                            width: 13,
-                            height: 13,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF24C77A),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                          ),
-                        ),
-                    ],
+                            )
+                        ? 'Clear selection'
+                        : 'Select all messages',
+                    icon: Icon(
+                      _selectableMessageIds.isNotEmpty &&
+                              selectedMessageIds.length ==
+                                  _selectableMessageIds.length &&
+                              selectedMessageIds.containsAll(
+                                _selectableMessageIds,
+                              )
+                          ? Icons.deselect_rounded
+                          : Icons.select_all_rounded,
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.user.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                ]
+              : [
+                  IconButton(
+                    onPressed: _openSearch,
+                    tooltip: 'Search messages',
+                    icon: const Icon(Icons.search_rounded),
+                  ),
+                  IconButton(
+                    onPressed: _openSharedMedia,
+                    tooltip: 'Photos, files and voice',
+                    icon: const Icon(Icons.perm_media_outlined),
+                  ),
+                  IconButton(
+                    onPressed: _showChatMenu,
+                    tooltip: 'More options',
+                    icon: const Icon(Icons.more_vert_rounded),
+                  ),
+                ],
+          titleSpacing: 0,
+          title: selectionMode
+              ? Text(
+                  '${selectedMessageIds.length} selected',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                )
+              : InkWell(
+                  onTap: _openContactDetails,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Row(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircleAvatar(
+                            radius: 23,
+                            backgroundColor: Colors.white,
+                            backgroundImage: widget.user.photoUrl == null
+                                ? null
+                                : NetworkImage(widget.user.photoUrl!),
+                            child: widget.user.photoUrl == null
+                                ? Text(widget.user.name[0].toUpperCase())
+                                : null,
                           ),
-                        ),
-                        StreamBuilder<bool>(
-                          stream: service.typing(widget.user.uid),
-                          builder: (_, snapshot) {
-                            final text = snapshot.data == true
-                                ? 'Typing…'
-                                : widget.user.isOnline
-                                ? 'Online'
-                                : _lastSeen(widget.user.lastSeen);
-                            return Text(
-                              text,
+                          if (widget.user.isOnline)
+                            Positioned(
+                              right: -1,
+                              bottom: 1,
+                              child: Container(
+                                width: 13,
+                                height: 13,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF24C77A),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.user.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              context.watch<ChatPresenceCubit>().state.typing
+                                  ? 'TypingÃ¢â‚¬Â¦'
+                                  : widget.user.isOnline
+                                  ? 'Online'
+                                  : _lastSeen(widget.user.lastSeen),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: Color(0xFF605968),
                               ),
-                            );
-                          },
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+          centerTitle: false,
+        ),
+        body: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: _chatBackgroundColor,
+                image: _activeBackgroundImageUrl == null
+                    ? null
+                    : DecorationImage(
+                        image: NetworkImage(_activeBackgroundImageUrl!),
+                        fit: BoxFit.cover,
+                      ),
+              ),
+              child: Column(
+                children: [
+                  if (_petState.pendingInvite case final invite?)
+                    _PetInviteBanner(
+                      invite: invite,
+                      mine: invite.senderId == petInviteService.myId,
+                      onAccept: () => _acceptPetInvite(invite),
+                      onReject: () => _rejectPetInvite(invite),
+                    ),
+                  PinnedMessageBanner(
+                    title: 'Pinned Messages',
+                    preferenceId: widget.user.uid,
+                    stream: pinnedMessageService.directPreferences(
+                      widget.user.uid,
+                    ),
+                    onTap: (messageId) =>
+                        _jumpToMessage(messageId, latestMessages),
+                    onRemove: (messageId) => pinnedMessageService.removeDirect(
+                      widget.user.uid,
+                      messageId,
                     ),
                   ),
-                ],
-              ),
-            ),
-      centerTitle: false,
-    ),
-    body: Stack(
-      children: [
-        Container(
-  decoration: BoxDecoration(
-    color: _chatBackgroundColor,
-    image: _activeBackgroundImageUrl == null
-        ? null
-        : DecorationImage(
-            image: NetworkImage(
-              _activeBackgroundImageUrl!,
-            ),
-            fit: BoxFit.cover,
-          ),
-  ),
-  child: Column(
-            children: [
-              StreamBuilder<PetInvite?>(
-                stream: petInviteService.watchPendingInviteWith(
-                  widget.user.uid,
-                ),
-                builder: (context, snapshot) {
-                  final invite = snapshot.data;
-                  if (invite == null) {
-                    return const SizedBox.shrink();
-                  }
-                  return _PetInviteBanner(
-                    invite: invite,
-                    mine: invite.senderId == petInviteService.myId,
-                    onAccept: () => _acceptPetInvite(invite),
-                    onReject: () => _rejectPetInvite(invite),
-                  );
-                },
-              ),
-              PinnedMessageBanner(
-                title: 'Pinned Messages',
-                preferenceId: widget.user.uid,
-                stream: pinnedMessageService.directPreferences(widget.user.uid),
-                onTap: (messageId) => _jumpToMessage(messageId, latestMessages),
-                onRemove: (messageId) => pinnedMessageService.removeDirect(
-                  widget.user.uid,
-                  messageId,
-                ),
-              ),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('conversations')
-                      .doc(activeConversationId)
-                      .collection('messages')
-                      .orderBy('sentAt', descending: true)
-                      .limit(messagePageSize)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final recentDocs = snapshot.data!.docs;
-                    final mergedById =
-                        <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
-
-                    for (final document in olderMessages) {
-                      mergedById[document.id] = document;
-                    }
-                    for (final document in recentDocs) {
-                      mergedById[document.id] = document;
-                    }
-
-                    final docs =
-                        mergedById.values.where((document) {
-                          final hiddenFor = List<String>.from(
-                            document.data()['hiddenFor'] as List? ?? const [],
-                          );
-                          return !hiddenFor.contains(service.myId);
-                        }).toList()..sort((a, b) {
-                          final aTime = a.data()['sentAt'] as Timestamp?;
-                          final bTime = b.data()['sentAt'] as Timestamp?;
-                          if (aTime == null && bTime == null) return 0;
-                          if (aTime == null) return 1;
-                          if (bTime == null) return -1;
-                          return bTime.compareTo(aTime);
-                        });
-
-                    latestMessages = docs;
-                    if (olderMessages.isEmpty &&
-                        recentDocs.length < messagePageSize) {
-                      hasMoreOlderMessages = false;
-                    }
-
-                    final currentMessageIds = recentDocs
-                        .map((doc) => doc.id)
-                        .toSet();
-                    final newMessageIds = messageSnapshotInitialized
-                        ? currentMessageIds.difference(knownMessageIds)
-                        : <String>{};
-                    final shouldCountNewMessages =
-                        messageSnapshotInitialized && newMessageIds.isNotEmpty;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      knownMessageIds
-                        ..clear()
-                        ..addAll(currentMessageIds);
-                      messageSnapshotInitialized = true;
-                      if (shouldCountNewMessages &&
-                          mounted &&
-                          messageScrollController.hasClients &&
-                          messageScrollController.offset > 240) {
-                        setState(() {
-                          newerMessagesBelow += newMessageIds.length;
-                          showJumpToLatest = true;
-                        });
-                      }
-                      service.markRead(widget.user.uid);
-                    });
-                    if (docs.isEmpty) {
-                      return Center(
-                        child: Text('Say hello to ${widget.user.name}'),
-                      );
-                    }
-                    return ListView.builder(
-                      controller: messageScrollController,
-                      reverse: true,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                      itemCount:
-                          docs.length +
-                          (loadingOlderMessages ||
-                                  (!hasMoreOlderMessages &&
-                                      olderMessages.isNotEmpty)
-                              ? 1
-                              : 0),
-                      itemBuilder: (_, i) {
-                        if (i >= docs.length) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: loadingOlderMessages
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Beginning of conversation',
-                                      style: TextStyle(
-                                        color: Color(0xFF9A919E),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                            ),
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final messagesState = context
+                            .watch<ChatMessagesBloc>()
+                            .state;
+                        final docs = messagesState.messages;
+                        final newMessageIds = messagesState.newMessageIds;
+                        if (messagesState.loadingInitial && docs.isEmpty) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
                           );
                         }
-
-                        final doc = docs[i];
-                        final data = doc.data();
-                        final mine = data['senderId'] == service.myId;
-                        final deleted = data['isDeleted'] as bool? ?? false;
-                        final sentAt = (data['sentAt'] as Timestamp?)?.toDate();
-                        final read = data['readAt'] != null;
-                        final replyData = data['replyTo'];
-                        final reply = replyData is Map
-                            ? MessageReply.fromMap(
-                                Map<String, dynamic>.from(replyData),
-                              )
-                            : null;
-                        final reactions = Map<String, dynamic>.from(
-                          data['reactions'] as Map? ?? const {},
-                        );
-                        final selected = selectedMessageIds.contains(doc.id);
-                        final highlighted = highlightedMessageId == doc.id;
-                        final olderSentAt = i == docs.length - 1
-                            ? null
-                            : (docs[i + 1].data()['sentAt'] as Timestamp?)
-                                  ?.toDate();
-                        final showDate =
-                            i == docs.length - 1 ||
-                            !_isSameDay(sentAt, olderSentAt);
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (showDate)
-                              _DateDivider(label: _dateLabel(sentAt)),
-                            TweenAnimationBuilder<double>(
-                              key: ValueKey('entry-${doc.id}'),
-                              tween: Tween<double>(
-                                begin: newMessageIds.contains(doc.id) ? 0 : 1,
-                                end: 1,
-                              ),
-                              duration: const Duration(milliseconds: 280),
-                              curve: Curves.easeOutCubic,
-                              child: Dismissible(
-                                key: ValueKey('swipe-${doc.id}'),
-                                direction: deleted || selectionMode
-                                    ? DismissDirection.none
-                                    : DismissDirection.endToStart,
-                                confirmDismiss: (_) async {
-                                  _replyToMessage(doc.id, data, mine);
-                                  return false;
-                                },
-                                background: const SizedBox.shrink(),
-                                secondaryBackground: const Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Padding(
-                                    padding: EdgeInsets.only(
-                                      right: 12,
-                                      bottom: 10,
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: 19,
-                                      backgroundColor: Color(0xFFE0D3F3),
-                                      child: Icon(
-                                        Icons.reply_rounded,
-                                        color: Color(0xFF7653A5),
-                                      ),
-                                    ),
-                                  ),
+                        if (docs.isEmpty) {
+                          return Center(
+                            child: Text('Say hello to ${widget.user.name}'),
+                          );
+                        }
+                        return ListView.builder(
+                          controller: messageScrollController,
+                          reverse: true,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                          itemCount:
+                              docs.length +
+                              (loadingOlderMessages ||
+                                      (!hasMoreOlderMessages &&
+                                          olderMessages.isNotEmpty)
+                                  ? 1
+                                  : 0),
+                          itemBuilder: (_, i) {
+                            if (i >= docs.length) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
                                 ),
-                                child: GestureDetector(
-                                  onTap: !selectionMode
-                                      ? null
-                                      : () => _toggleSelection(doc.id),
-                                  onDoubleTap: deleted || selectionMode
-                                      ? null
-                                      : () => _quickHeart(doc.id),
-                                  onLongPress: deleted
-                                      ? null
-                                      : selectionMode
-                                      ? () => _toggleSelection(doc.id)
-                                      : () => _showActions(doc.id, data, mine),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      if (selectionMode) ...[
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 10,
-                                            bottom: 18,
+                                child: Center(
+                                  child: loadingOlderMessages
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
                                           ),
-                                          child: InkWell(
-                                            onTap: () =>
-                                                _toggleSelection(doc.id),
-                                            customBorder: const CircleBorder(),
-                                            child: AnimatedContainer(
-                                              duration: const Duration(
-                                                milliseconds: 160,
-                                              ),
-                                              width: 24,
-                                              height: 24,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: selected
-                                                    ? const Color(0xFF7653A5)
-                                                    : Colors.transparent,
-                                                border: Border.all(
-                                                  color: selected
-                                                      ? const Color(0xFF7653A5)
-                                                      : const Color(0xFF9B93A0),
-                                                  width: 2,
-                                                ),
-                                              ),
-                                              child: selected
-                                                  ? const Icon(
-                                                      Icons.check_rounded,
-                                                      size: 17,
-                                                      color: Colors.white,
-                                                    )
-                                                  : null,
-                                            ),
+                                        )
+                                      : const Text(
+                                          'Beginning of conversation',
+                                          style: TextStyle(
+                                            color: Color(0xFF9A919E),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
-                                      ],
-                                      Expanded(
-                                        child: Stack(
-                                          children: [
-                                            Align(
-                                              alignment: mine
-                                                  ? Alignment.centerRight
-                                                  : Alignment.centerLeft,
-                                              child: AnimatedContainer(
-                                                duration: const Duration(
-                                                  milliseconds: 240,
-                                                ),
-                                                curve: Curves.easeOut,
-                                                constraints: BoxConstraints(
-                                                  maxWidth:
-                                                      MediaQuery.sizeOf(
-                                                        context,
-                                                      ).width *
-                                                      0.76,
-                                                ),
-                                                margin: const EdgeInsets.only(
-                                                  bottom: 10,
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 15,
-                                                      vertical: 9,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: mine
-                                                      ? const Color(0xFFCDBCEB)
-                                                      : const Color(0xFFFFFCF3),
-                                                  borderRadius: BorderRadius.only(
-                                                    topLeft:
-                                                        const Radius.circular(
-                                                          17,
-                                                        ),
-                                                    topRight:
-                                                        const Radius.circular(
-                                                          17,
-                                                        ),
-                                                    bottomLeft: Radius.circular(
-                                                      mine ? 17 : 5,
-                                                    ),
-                                                    bottomRight:
-                                                        Radius.circular(
-                                                          mine ? 5 : 17,
-                                                        ),
+                                ),
+                              );
+                            }
+
+                            final doc = docs[i];
+                            final data = doc.data();
+                            final mine = data['senderId'] == service.myId;
+                            final deleted = data['isDeleted'] as bool? ?? false;
+                            final sentAt = (data['sentAt'] as Timestamp?)
+                                ?.toDate();
+                            final read = data['readAt'] != null;
+                            final replyData = data['replyTo'];
+                            final reply = replyData is Map
+                                ? MessageReply.fromMap(
+                                    Map<String, dynamic>.from(replyData),
+                                  )
+                                : null;
+                            final reactions = Map<String, dynamic>.from(
+                              data['reactions'] as Map? ?? const {},
+                            );
+                            final selected = selectedMessageIds.contains(
+                              doc.id,
+                            );
+                            final highlighted = highlightedMessageId == doc.id;
+                            final olderSentAt = i == docs.length - 1
+                                ? null
+                                : (docs[i + 1].data()['sentAt'] as Timestamp?)
+                                      ?.toDate();
+                            final showDate =
+                                i == docs.length - 1 ||
+                                !_isSameDay(sentAt, olderSentAt);
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (showDate)
+                                  _DateDivider(label: _dateLabel(sentAt)),
+                                TweenAnimationBuilder<double>(
+                                  key: ValueKey('entry-${doc.id}'),
+                                  tween: Tween<double>(
+                                    begin: newMessageIds.contains(doc.id)
+                                        ? 0
+                                        : 1,
+                                    end: 1,
+                                  ),
+                                  duration: const Duration(milliseconds: 280),
+                                  curve: Curves.easeOutCubic,
+                                  child: Dismissible(
+                                    key: ValueKey('swipe-${doc.id}'),
+                                    direction: deleted || selectionMode
+                                        ? DismissDirection.none
+                                        : DismissDirection.endToStart,
+                                    confirmDismiss: (_) async {
+                                      _replyToMessage(doc.id, data, mine);
+                                      return false;
+                                    },
+                                    background: const SizedBox.shrink(),
+                                    secondaryBackground: const Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(
+                                          right: 12,
+                                          bottom: 10,
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 19,
+                                          backgroundColor: Color(0xFFE0D3F3),
+                                          child: Icon(
+                                            Icons.reply_rounded,
+                                            color: Color(0xFF7653A5),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    child: GestureDetector(
+                                      onTap: !selectionMode
+                                          ? null
+                                          : () => _toggleSelection(doc.id),
+                                      onDoubleTap: deleted || selectionMode
+                                          ? null
+                                          : () => _quickHeart(doc.id),
+                                      onLongPress: deleted
+                                          ? null
+                                          : selectionMode
+                                          ? () => _toggleSelection(doc.id)
+                                          : () => _showActions(
+                                              doc.id,
+                                              data,
+                                              mine,
+                                            ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          if (selectionMode) ...[
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                right: 10,
+                                                bottom: 18,
+                                              ),
+                                              child: InkWell(
+                                                onTap: () =>
+                                                    _toggleSelection(doc.id),
+                                                customBorder:
+                                                    const CircleBorder(),
+                                                child: AnimatedContainer(
+                                                  duration: const Duration(
+                                                    milliseconds: 160,
                                                   ),
-                                                  boxShadow: [
-                                                    const BoxShadow(
-                                                      color: Color(0x0D000000),
-                                                      blurRadius: 5,
-                                                      offset: Offset(0, 2),
-                                                    ),
-                                                    if (highlighted)
-                                                      const BoxShadow(
-                                                        color: Color(
-                                                          0x557653A5,
-                                                        ),
-                                                        blurRadius: 16,
-                                                        spreadRadius: 3,
-                                                      ),
-                                                  ],
-                                                  border: selected
-                                                      ? Border.all(
-                                                          color: const Color(
+                                                  width: 24,
+                                                  height: 24,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: selected
+                                                        ? const Color(
                                                             0xFF7653A5,
-                                                          ),
-                                                          width: 2,
-                                                        )
-                                                      : highlighted
-                                                      ? Border.all(
-                                                          color: const Color(
-                                                            0xFF8D6BB8,
-                                                          ),
-                                                          width: 2,
+                                                          )
+                                                        : Colors.transparent,
+                                                    border: Border.all(
+                                                      color: selected
+                                                          ? const Color(
+                                                              0xFF7653A5,
+                                                            )
+                                                          : const Color(
+                                                              0xFF9B93A0,
+                                                            ),
+                                                      width: 2,
+                                                    ),
+                                                  ),
+                                                  child: selected
+                                                      ? const Icon(
+                                                          Icons.check_rounded,
+                                                          size: 17,
+                                                          color: Colors.white,
                                                         )
                                                       : null,
                                                 ),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.end,
-                                                  children: [
-                                                    if (reply != null)
-                                                      MessageReplyCard(
-                                                        reply: reply,
-                                                        onTap: () =>
-                                                            _jumpToMessage(
-                                                              reply.messageId,
-                                                              docs,
+                                              ),
+                                            ),
+                                          ],
+                                          Expanded(
+                                            child: Stack(
+                                              children: [
+                                                Align(
+                                                  alignment: mine
+                                                      ? Alignment.centerRight
+                                                      : Alignment.centerLeft,
+                                                  child: AnimatedContainer(
+                                                    duration: const Duration(
+                                                      milliseconds: 240,
+                                                    ),
+                                                    curve: Curves.easeOut,
+                                                    constraints: BoxConstraints(
+                                                      maxWidth:
+                                                          MediaQuery.sizeOf(
+                                                            context,
+                                                          ).width *
+                                                          0.76,
+                                                    ),
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                          bottom: 10,
+                                                        ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 15,
+                                                          vertical: 9,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: mine
+                                                          ? const Color(
+                                                              0xFFCDBCEB,
+                                                            )
+                                                          : const Color(
+                                                              0xFFFFFCF3,
+                                                            ),
+                                                      borderRadius: BorderRadius.only(
+                                                        topLeft:
+                                                            const Radius.circular(
+                                                              17,
+                                                            ),
+                                                        topRight:
+                                                            const Radius.circular(
+                                                              17,
+                                                            ),
+                                                        bottomLeft:
+                                                            Radius.circular(
+                                                              mine ? 17 : 5,
+                                                            ),
+                                                        bottomRight:
+                                                            Radius.circular(
+                                                              mine ? 5 : 17,
                                                             ),
                                                       ),
-                                                    if (!deleted &&
-                                                        data['type'] == 'file')
-                                                      FileMessageBubble(
-                                                        name:
-                                                            data['fileName']
-                                                                as String? ??
-                                                            'File',
-                                                        url:
-                                                            data['fileUrl']
-                                                                as String,
-                                                        size:
-                                                            data['fileSize']
-                                                                as int? ??
-                                                            0,
-                                                        mine: mine,
-                                                      )
-                                                    else if (!deleted &&
-                                                        data['type'] == 'voice')
-                                                      VoiceMessageBubble(
-                                                        url:
-                                                            data['audioUrl']
-                                                                as String,
-                                                        durationMs:
-                                                            data['durationMs']
-                                                                as int? ??
-                                                            0,
-                                                        mine: mine,
-                                                      )
-                                                    else if (!deleted &&
-                                                        data['type'] == 'image')
-                                                      GestureDetector(
-                                                        onTap: () => Navigator.push(
-                                                          context,
-                                                          MaterialPageRoute(
-                                                            builder: (_) => MediaViewerPage(
-                                                              url:
-                                                                  data['imageUrl']
-                                                                      as String,
-                                                              name:
-                                                                  'VonoTalky_${doc.id}.jpg',
+                                                      boxShadow: [
+                                                        const BoxShadow(
+                                                          color: Color(
+                                                            0x0D000000,
+                                                          ),
+                                                          blurRadius: 5,
+                                                          offset: Offset(0, 2),
+                                                        ),
+                                                        if (highlighted)
+                                                          const BoxShadow(
+                                                            color: Color(
+                                                              0x557653A5,
                                                             ),
+                                                            blurRadius: 16,
+                                                            spreadRadius: 3,
                                                           ),
-                                                        ),
-                                                        child: ClipRRect(
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                13,
-                                                              ),
-                                                          child: Image.network(
-                                                            data['imageUrl']
-                                                                as String,
-                                                            width: 230,
-                                                            height: 230,
-                                                            fit: BoxFit.cover,
-                                                            loadingBuilder:
-                                                                (
-                                                                  _,
-                                                                  child,
-                                                                  loading,
-                                                                ) => loading == null
-                                                                ? child
-                                                                : const Center(
-                                                                    child: CircularProgressIndicator(
-                                                                      color: Color(
-                                                                        0xFFB49ADF,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                            errorBuilder:
-                                                                (
-                                                                  _,
-                                                                  _,
-                                                                  _,
-                                                                ) => const SizedBox(
-                                                                  width: 230,
-                                                                  height: 230,
-                                                                  child: Center(
-                                                                    child: Icon(
-                                                                      Icons
-                                                                          .broken_image_outlined,
-                                                                      size: 42,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                          ),
-                                                        ),
-                                                      )
-                                                    else
-                                                      Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            deleted
-                                                                ? 'This message was recalled'
-                                                                : data['text']
-                                                                          as String? ??
-                                                                      '',
-                                                            style: TextStyle(
+                                                      ],
+                                                      border: selected
+                                                          ? Border.all(
                                                               color:
                                                                   const Color(
+                                                                    0xFF7653A5,
+                                                                  ),
+                                                              width: 2,
+                                                            )
+                                                          : highlighted
+                                                          ? Border.all(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF8D6BB8,
+                                                                  ),
+                                                              width: 2,
+                                                            )
+                                                          : null,
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .end,
+                                                      children: [
+                                                        if (reply != null)
+                                                          MessageReplyCard(
+                                                            reply: reply,
+                                                            onTap: () =>
+                                                                _jumpToMessage(
+                                                                  reply
+                                                                      .messageId,
+                                                                  docs,
+                                                                ),
+                                                          ),
+                                                        if (!deleted &&
+                                                            data['type'] ==
+                                                                'file')
+                                                          FileMessageBubble(
+                                                            name:
+                                                                data['fileName']
+                                                                    as String? ??
+                                                                'File',
+                                                            url:
+                                                                data['fileUrl']
+                                                                    as String,
+                                                            size:
+                                                                data['fileSize']
+                                                                    as int? ??
+                                                                0,
+                                                            mine: mine,
+                                                          )
+                                                        else if (!deleted &&
+                                                            data['type'] ==
+                                                                'voice')
+                                                          VoiceMessageBubble(
+                                                            url:
+                                                                data['audioUrl']
+                                                                    as String,
+                                                            durationMs:
+                                                                data['durationMs']
+                                                                    as int? ??
+                                                                0,
+                                                            mine: mine,
+                                                          )
+                                                        else if (!deleted &&
+                                                            data['type'] ==
+                                                                'image')
+                                                          GestureDetector(
+                                                            onTap: () => Navigator.push(
+                                                              context,
+                                                              MaterialPageRoute(
+                                                                builder: (_) => MediaViewerPage(
+                                                                  url:
+                                                                      data['imageUrl']
+                                                                          as String,
+                                                                  name:
+                                                                      'VonoTalky_${doc.id}.jpg',
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            child: ClipRRect(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    13,
+                                                                  ),
+                                                              child: Image.network(
+                                                                data['imageUrl']
+                                                                    as String,
+                                                                width: 230,
+                                                                height: 230,
+                                                                fit: BoxFit
+                                                                    .cover,
+                                                                loadingBuilder:
+                                                                    (
+                                                                      _,
+                                                                      child,
+                                                                      loading,
+                                                                    ) => loading == null
+                                                                    ? child
+                                                                    : const Center(
+                                                                        child: CircularProgressIndicator(
+                                                                          color: Color(
+                                                                            0xFFB49ADF,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                errorBuilder:
+                                                                    (
+                                                                      _,
+                                                                      _,
+                                                                      _,
+                                                                    ) => const SizedBox(
+                                                                      width:
+                                                                          230,
+                                                                      height:
+                                                                          230,
+                                                                      child: Center(
+                                                                        child: Icon(
+                                                                          Icons
+                                                                              .broken_image_outlined,
+                                                                          size:
+                                                                              42,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          )
+                                                        else
+                                                          Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                deleted
+                                                                    ? 'This message was recalled'
+                                                                    : data['text']
+                                                                              as String? ??
+                                                                          '',
+                                                                style: TextStyle(
+                                                                  color: const Color(
                                                                     0xFF24202A,
                                                                   ),
-                                                              fontStyle: deleted
-                                                                  ? FontStyle
-                                                                        .italic
-                                                                  : FontStyle
-                                                                        .normal,
-                                                            ),
-                                                          ),
-                                                          if (!deleted &&
-                                                              _firstUrl(
+                                                                  fontStyle:
+                                                                      deleted
+                                                                      ? FontStyle
+                                                                            .italic
+                                                                      : FontStyle
+                                                                            .normal,
+                                                                ),
+                                                              ),
+                                                              if (!deleted &&
+                                                                  _firstUrl(
+                                                                        data['text']
+                                                                                as String? ??
+                                                                            '',
+                                                                      ) !=
+                                                                      null) ...[
+                                                                const SizedBox(
+                                                                  height: 8,
+                                                                ),
+                                                                _LinkPreviewButton(
+                                                                  url: _firstUrl(
                                                                     data['text']
                                                                             as String? ??
                                                                         '',
-                                                                  ) !=
-                                                                  null) ...[
-                                                            const SizedBox(
-                                                              height: 8,
-                                                            ),
-                                                            _LinkPreviewButton(
-                                                              url: _firstUrl(
-                                                                data['text']
-                                                                        as String? ??
-                                                                    '',
-                                                              )!,
-                                                              onTap: _openLink,
-                                                            ),
-                                                          ],
-                                                        ],
-                                                      ),
-                                                    const SizedBox(height: 3),
-                                                    Tooltip(
-                                                      message:
-                                                          'Message details',
-                                                      child: InkWell(
-                                                        onTap: () =>
-                                                            _showMessageDetails(
-                                                              data,
-                                                              mine,
-                                                            ),
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              10,
-                                                            ),
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 3,
-                                                                vertical: 2,
-                                                              ),
-                                                          child: Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              Text(
-                                                                sentAt == null
-                                                                    ? 'Sending…'
-                                                                    : _messageTime(
-                                                                        sentAt,
-                                                                      ),
-                                                                style: const TextStyle(
-                                                                  fontSize: 10,
-                                                                  color: Color(
-                                                                    0xFF716A78,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              if (data['editedAt'] !=
-                                                                  null) ...[
-                                                                const SizedBox(
-                                                                  width: 4,
-                                                                ),
-                                                                const Text(
-                                                                  'edited',
-                                                                  style: TextStyle(
-                                                                    fontSize: 9,
-                                                                    color: Color(
-                                                                      0xFF716A78,
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                              if (mine) ...[
-                                                                const SizedBox(
-                                                                  width: 4,
-                                                                ),
-                                                                Icon(
-                                                                  sentAt == null
-                                                                      ? Icons
-                                                                            .schedule_rounded
-                                                                      : read
-                                                                      ? Icons
-                                                                            .done_all_rounded
-                                                                      : Icons
-                                                                            .done_rounded,
-                                                                  size: 14,
-                                                                  color:
-                                                                      sentAt ==
-                                                                          null
-                                                                      ? const Color(
-                                                                          0xFF8C8296,
-                                                                        )
-                                                                      : read
-                                                                      ? const Color(
-                                                                          0xFF7150A1,
-                                                                        )
-                                                                      : const Color(
-                                                                          0xFF8C8296,
-                                                                        ),
+                                                                  )!,
+                                                                  onTap:
+                                                                      _openLink,
                                                                 ),
                                                               ],
                                                             ],
                                                           ),
+                                                        const SizedBox(
+                                                          height: 3,
                                                         ),
-                                                      ),
-                                                    ),
-                                                    if (reactions
-                                                        .isNotEmpty) ...[
-                                                      const SizedBox(height: 5),
-                                                      Wrap(
-                                                        spacing: 5,
-                                                        runSpacing: 4,
-                                                        children: reactions.entries.map((
-                                                          entry,
-                                                        ) {
-                                                          final users =
-                                                              List<String>.from(
-                                                                entry.value
-                                                                        as List? ??
-                                                                    const [],
-                                                              );
-                                                          final mine = users
-                                                              .contains(
-                                                                service.myId,
-                                                              );
-                                                          return InkWell(
-                                                            onTap: () => service
-                                                                .toggleReaction(
-                                                                  widget
-                                                                      .user
-                                                                      .uid,
-                                                                  doc.id,
-                                                                  entry.key,
-                                                                ),
-                                                            onLongPress: () =>
-                                                                _showReactionDetails(
-                                                                  entry.key,
-                                                                  users,
+                                                        Tooltip(
+                                                          message:
+                                                              'Message details',
+                                                          child: InkWell(
+                                                            onTap: () =>
+                                                                _showMessageDetails(
+                                                                  data,
+                                                                  mine,
                                                                 ),
                                                             borderRadius:
                                                                 BorderRadius.circular(
-                                                                  14,
+                                                                  10,
                                                                 ),
-                                                            child: Container(
+                                                            child: Padding(
                                                               padding:
                                                                   const EdgeInsets.symmetric(
                                                                     horizontal:
-                                                                        7,
-                                                                    vertical: 3,
+                                                                        3,
+                                                                    vertical: 2,
                                                                   ),
-                                                              decoration: BoxDecoration(
-                                                                color: mine
-                                                                    ? const Color(
-                                                                        0xFFE2D4F5,
-                                                                      )
-                                                                    : const Color(
-                                                                        0xFFF4EFF8,
+                                                              child: Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Text(
+                                                                    sentAt ==
+                                                                            null
+                                                                        ? 'SendingÃ¢â‚¬Â¦'
+                                                                        : _messageTime(
+                                                                            sentAt,
+                                                                          ),
+                                                                    style: const TextStyle(
+                                                                      fontSize:
+                                                                          10,
+                                                                      color: Color(
+                                                                        0xFF716A78,
                                                                       ),
+                                                                    ),
+                                                                  ),
+                                                                  if (data['editedAt'] !=
+                                                                      null) ...[
+                                                                    const SizedBox(
+                                                                      width: 4,
+                                                                    ),
+                                                                    const Text(
+                                                                      'edited',
+                                                                      style: TextStyle(
+                                                                        fontSize:
+                                                                            9,
+                                                                        color: Color(
+                                                                          0xFF716A78,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                  if (mine) ...[
+                                                                    const SizedBox(
+                                                                      width: 4,
+                                                                    ),
+                                                                    Icon(
+                                                                      sentAt ==
+                                                                              null
+                                                                          ? Icons.schedule_rounded
+                                                                          : read
+                                                                          ? Icons.done_all_rounded
+                                                                          : Icons.done_rounded,
+                                                                      size: 14,
+                                                                      color:
+                                                                          sentAt ==
+                                                                              null
+                                                                          ? const Color(
+                                                                              0xFF8C8296,
+                                                                            )
+                                                                          : read
+                                                                          ? const Color(
+                                                                              0xFF7150A1,
+                                                                            )
+                                                                          : const Color(
+                                                                              0xFF8C8296,
+                                                                            ),
+                                                                    ),
+                                                                  ],
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (reactions
+                                                            .isNotEmpty) ...[
+                                                          const SizedBox(
+                                                            height: 5,
+                                                          ),
+                                                          Wrap(
+                                                            spacing: 5,
+                                                            runSpacing: 4,
+                                                            children: reactions.entries.map((
+                                                              entry,
+                                                            ) {
+                                                              final users =
+                                                                  List<
+                                                                    String
+                                                                  >.from(
+                                                                    entry.value
+                                                                            as List? ??
+                                                                        const [],
+                                                                  );
+                                                              final mine = users
+                                                                  .contains(
+                                                                    service
+                                                                        .myId,
+                                                                  );
+                                                              return InkWell(
+                                                                onTap: () => service
+                                                                    .toggleReaction(
+                                                                      widget
+                                                                          .user
+                                                                          .uid,
+                                                                      doc.id,
+                                                                      entry.key,
+                                                                    ),
+                                                                onLongPress: () =>
+                                                                    _showReactionDetails(
+                                                                      entry.key,
+                                                                      users,
+                                                                    ),
                                                                 borderRadius:
                                                                     BorderRadius.circular(
                                                                       14,
                                                                     ),
-                                                              ),
-                                                              child: Text(
-                                                                '${entry.key} ${users.length}',
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }).toList(),
-                                                      ),
-                                                    ],
-                                                  ],
+                                                                child: Container(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            7,
+                                                                        vertical:
+                                                                            3,
+                                                                      ),
+                                                                  decoration: BoxDecoration(
+                                                                    color: mine
+                                                                        ? const Color(
+                                                                            0xFFE2D4F5,
+                                                                          )
+                                                                        : const Color(
+                                                                            0xFFF4EFF8,
+                                                                          ),
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          14,
+                                                                        ),
+                                                                  ),
+                                                                  child: Text(
+                                                                    '${entry.key} ${users.length}',
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            }).toList(),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                  ),
                                                 ),
-                                              ),
-                                            ),
-                                            if (heartAnimations.contains(
-                                              doc.id,
-                                            ))
-                                              Positioned.fill(
-                                                child: IgnorePointer(
-                                                  child: Center(
-                                                    child:
-                                                        TweenAnimationBuilder<
-                                                          double
-                                                        >(
+                                                if (heartAnimations.contains(
+                                                  doc.id,
+                                                ))
+                                                  Positioned.fill(
+                                                    child: IgnorePointer(
+                                                      child: Center(
+                                                        child: TweenAnimationBuilder<double>(
                                                           key: ValueKey(
                                                             'heart-${doc.id}',
                                                           ),
@@ -1642,7 +1538,7 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                                                                         child,
                                                                   ),
                                                           child: const Text(
-                                                            '❤️',
+                                                            'Ã¢ÂÂ¤Ã¯Â¸Â',
                                                             style: TextStyle(
                                                               fontSize: 42,
                                                               shadows: [
@@ -1656,444 +1552,466 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
                                                             ),
                                                           ),
                                                         ),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
+                                  ),
+                                  builder: (_, value, child) => Opacity(
+                                    opacity: value,
+                                    child: Transform.translate(
+                                      offset: Offset(0, (1 - value) * 14),
+                                      child: child,
+                                    ),
                                   ),
                                 ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  if (!selectionMode)
+                    SafeArea(
+                      top: false,
+                      bottom: MediaQuery.viewInsetsOf(context).bottom == 0,
+                      maintainBottomViewPadding: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (failedMessageText != null) ...[
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFE9EB),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFF3BBC0),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline_rounded,
+                                      size: 19,
+                                      color: Color(0xFFC24E58),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        failedMessageText!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF74363C),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: sending
+                                          ? null
+                                          : _retryFailedMessage,
+                                      tooltip: 'Retry message',
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        color: Color(0xFFC24E58),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: () => context
+                                          .read<ChatComposerCubit>()
+                                          .clearFailure(),
+                                      tooltip: 'Dismiss failed message',
+                                      visualDensity: VisualDensity.compact,
+                                      icon: const Icon(
+                                        Icons.close_rounded,
+                                        size: 18,
+                                        color: Color(0xFF8D6266),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              builder: (_, value, child) => Opacity(
-                                opacity: value,
-                                child: Transform.translate(
-                                  offset: Offset(0, (1 - value) * 14),
-                                  child: child,
+                            ],
+                            if (historyJumpTargetId != null)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF4EFFB),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Finding original messageÃ¢â‚¬Â¦',
+                                      style: TextStyle(
+                                        color: Color(0xFF6F5C81),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (replyingTo != null)
+                              ReplyComposerBar(
+                                reply: replyingTo!,
+                                onTap: () => _jumpToMessage(
+                                  replyingTo!.messageId,
+                                  latestMessages,
+                                ),
+                                onClose: () => context
+                                    .read<ChatComposerCubit>()
+                                    .clearReply(),
+                              ),
+                            if (replyingTo != null) const SizedBox(height: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(26),
+                                border: Border.all(
+                                  color: const Color(0xFFE1DCE8),
+                                ),
+                              ),
+                              child: recording
+                                  ? RecordingComposer(
+                                      seconds: voiceSeconds,
+                                      uploading: uploading,
+                                      onCancel: _cancelRecording,
+                                      onSend: _sendRecording,
+                                    )
+                                  : Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: uploading || sending
+                                              ? null
+                                              : _toggleVoiceInputMode,
+                                          tooltip: voiceInputMode
+                                              ? 'Switch to keyboard'
+                                              : 'Switch to voice',
+                                          style: IconButton.styleFrom(
+                                            foregroundColor: const Color(
+                                              0xFF5F3F86,
+                                            ),
+                                          ),
+                                          icon: Icon(
+                                            voiceInputMode
+                                                ? Icons.keyboard_alt_outlined
+                                                : Icons.mic_none_rounded,
+                                            size: 24,
+                                          ),
+                                        ),
+                                        if (voiceInputMode)
+                                          _voiceHoldButton()
+                                        else
+                                          Expanded(
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                minHeight: 42,
+                                                maxHeight: 104,
+                                              ),
+                                              child: TextField(
+                                                controller: controller,
+                                                focusNode: messageFocusNode,
+                                                textAlignVertical:
+                                                    TextAlignVertical.center,
+                                                onTap: () {
+                                                  if (showEmojiPicker) {
+                                                    context
+                                                        .read<
+                                                          ChatComposerCubit
+                                                        >()
+                                                        .setEmojiPicker(false);
+                                                  }
+                                                },
+                                                maxLines: 4,
+                                                minLines: 1,
+                                                maxLength: 2000,
+                                                buildCounter:
+                                                    (
+                                                      context, {
+                                                      required currentLength,
+                                                      required isFocused,
+                                                      required maxLength,
+                                                    }) {
+                                                      if (currentLength <
+                                                          1800) {
+                                                        return const SizedBox.shrink();
+                                                      }
+                                                      final nearlyFull =
+                                                          currentLength >= 1950;
+                                                      return Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              right: 4,
+                                                              top: 2,
+                                                            ),
+                                                        child: Text(
+                                                          '${2000 - currentLength} characters left',
+                                                          style: TextStyle(
+                                                            color: nearlyFull
+                                                                ? const Color(
+                                                                    0xFFC24E58,
+                                                                  )
+                                                                : const Color(
+                                                                    0xFF8B7B98,
+                                                                  ),
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                nearlyFull
+                                                                ? FontWeight
+                                                                      .w700
+                                                                : FontWeight
+                                                                      .w500,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                decoration: InputDecoration(
+                                                  hintText: 'Type a message...',
+                                                  border: InputBorder.none,
+                                                  isDense: true,
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 11,
+                                                      ),
+                                                  suffixIcon:
+                                                      controller.text.isEmpty
+                                                      ? null
+                                                      : IconButton(
+                                                          onPressed:
+                                                              _clearComposer,
+                                                          tooltip:
+                                                              'Clear message',
+                                                          visualDensity:
+                                                              VisualDensity
+                                                                  .compact,
+                                                          icon: const Icon(
+                                                            Icons
+                                                                .cancel_rounded,
+                                                            size: 18,
+                                                            color: Color(
+                                                              0xFF9A92A3,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                  suffixIconConstraints:
+                                                      const BoxConstraints(
+                                                        minWidth: 34,
+                                                        minHeight: 34,
+                                                      ),
+                                                ),
+                                                onSubmitted: (_) => send(),
+                                              ),
+                                            ),
+                                          ),
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: voiceInputMode
+                                              ? null
+                                              : _toggleEmojiPicker,
+                                          tooltip: showEmojiPicker
+                                              ? 'Close emoji picker'
+                                              : 'Open emoji picker',
+                                          style: IconButton.styleFrom(
+                                            foregroundColor: const Color(
+                                              0xFF5F3F86,
+                                            ),
+                                          ),
+                                          icon: Icon(
+                                            showEmojiPicker
+                                                ? Icons
+                                                      .sentiment_satisfied_alt_rounded
+                                                : Icons
+                                                      .sentiment_satisfied_alt_outlined,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: uploading
+                                              ? null
+                                              : _showImageSource,
+                                          tooltip: 'More',
+                                          style: IconButton.styleFrom(
+                                            foregroundColor: const Color(
+                                              0xFF5F3F86,
+                                            ),
+                                          ),
+                                          icon: uploading
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : const Icon(
+                                                  Icons
+                                                      .add_circle_outline_rounded,
+                                                  size: 25,
+                                                ),
+                                        ),
+                                        if (!voiceInputMode &&
+                                            controller.text.trim().isNotEmpty)
+                                          IconButton.filled(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            style: IconButton.styleFrom(
+                                              backgroundColor: const Color(
+                                                0xFF7653A5,
+                                              ),
+                                              foregroundColor: Colors.white,
+                                              disabledBackgroundColor:
+                                                  const Color(0xFFD9CDE8),
+                                              disabledForegroundColor:
+                                                  Colors.white70,
+                                            ),
+                                            onPressed: uploading || sending
+                                                ? null
+                                                : send,
+                                            tooltip: sending
+                                                ? 'Sending message'
+                                                : 'Send message',
+                                            icon: sending
+                                                ? const SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2.2,
+                                                          color: Colors.white,
+                                                        ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.send_rounded,
+                                                    size: 19,
+                                                  ),
+                                          ),
+                                      ],
+                                    ),
+                            ),
+                            if (showEmojiPicker)
+                              ChatEmojiPicker(onSelected: _insertEmoji),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 18,
+              bottom: 92,
+              child: AnimatedScale(
+                scale: showJumpToLatest ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutBack,
+                child: Material(
+                  color: Colors.white,
+                  elevation: 4,
+                  shadowColor: const Color(0x33000000),
+                  borderRadius: BorderRadius.circular(22),
+                  child: InkWell(
+                    onTap: _jumpToLatest,
+                    borderRadius: BorderRadius.circular(22),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF7653A5),
+                          ),
+                          if (newerMessagesBelow > 0) ...[
+                            const SizedBox(width: 2),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              transitionBuilder: (child, animation) =>
+                                  ScaleTransition(
+                                    scale: animation,
+                                    child: child,
+                                  ),
+                              child: Text(
+                                newerMessagesBelow > 99
+                                    ? '99+'
+                                    : '$newerMessagesBelow',
+                                key: ValueKey(newerMessagesBelow),
+                                style: const TextStyle(
+                                  color: Color(0xFF7653A5),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
                           ],
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              if (!selectionMode)
-                SafeArea(
-                  top: false,
-                  bottom: MediaQuery.viewInsetsOf(context).bottom == 0,
-                  maintainBottomViewPadding: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (failedMessageText != null) ...[
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFE9EB),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: const Color(0xFFF3BBC0),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline_rounded,
-                                  size: 19,
-                                  color: Color(0xFFC24E58),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    failedMessageText!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF74363C),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: sending
-                                      ? null
-                                      : _retryFailedMessage,
-                                  tooltip: 'Retry message',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: const Icon(
-                                    Icons.refresh_rounded,
-                                    color: Color(0xFFC24E58),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () => setState(() {
-                                    failedMessageText = null;
-                                    failedMessageReply = null;
-                                  }),
-                                  tooltip: 'Dismiss failed message',
-                                  visualDensity: VisualDensity.compact,
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 18,
-                                    color: Color(0xFF8D6266),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
-                        if (historyJumpTargetId != null)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF4EFFB),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Row(
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Finding original message…',
-                                  style: TextStyle(
-                                    color: Color(0xFF6F5C81),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (replyingTo != null)
-                          ReplyComposerBar(
-                            reply: replyingTo!,
-                            onTap: () => _jumpToMessage(
-                              replyingTo!.messageId,
-                              latestMessages,
-                            ),
-                            onClose: () => setState(() => replyingTo = null),
-                          ),
-                        if (replyingTo != null) const SizedBox(height: 5),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(26),
-                            border: Border.all(color: const Color(0xFFE1DCE8)),
-                          ),
-                          child: recording
-                              ? RecordingComposer(
-                                  seconds: voiceSeconds,
-                                  uploading: uploading,
-                                  onCancel: _cancelRecording,
-                                  onSend: _sendRecording,
-                                )
-                              : Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: uploading || sending
-                                          ? null
-                                          : _toggleVoiceInputMode,
-                                      tooltip: voiceInputMode
-                                          ? 'Switch to keyboard'
-                                          : 'Switch to voice',
-                                      style: IconButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF5F3F86,
-                                        ),
-                                      ),
-                                      icon: Icon(
-                                        voiceInputMode
-                                            ? Icons.keyboard_alt_outlined
-                                            : Icons.mic_none_rounded,
-                                        size: 24,
-                                      ),
-                                    ),
-                                    if (voiceInputMode)
-                                      _voiceHoldButton()
-                                    else
-                                      Expanded(
-                                        child: ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            minHeight: 42,
-                                            maxHeight: 104,
-                                          ),
-                                          child: TextField(
-                                            controller: controller,
-                                            focusNode: messageFocusNode,
-                                            textAlignVertical:
-                                                TextAlignVertical.center,
-                                            onTap: () {
-                                              if (showEmojiPicker) {
-                                                setState(
-                                                  () => showEmojiPicker = false,
-                                                );
-                                              }
-                                            },
-                                            maxLines: 4,
-                                            minLines: 1,
-                                            maxLength: 2000,
-                                            buildCounter:
-                                                (
-                                                  context, {
-                                                  required currentLength,
-                                                  required isFocused,
-                                                  required maxLength,
-                                                }) {
-                                                  if (currentLength < 1800) {
-                                                    return const SizedBox.shrink();
-                                                  }
-                                                  final nearlyFull =
-                                                      currentLength >= 1950;
-                                                  return Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                          right: 4,
-                                                          top: 2,
-                                                        ),
-                                                    child: Text(
-                                                      '${2000 - currentLength} characters left',
-                                                      style: TextStyle(
-                                                        color: nearlyFull
-                                                            ? const Color(
-                                                                0xFFC24E58,
-                                                              )
-                                                            : const Color(
-                                                                0xFF8B7B98,
-                                                              ),
-                                                        fontSize: 10,
-                                                        fontWeight: nearlyFull
-                                                            ? FontWeight.w700
-                                                            : FontWeight.w500,
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                            decoration: InputDecoration(
-                                              hintText: 'Type a message...',
-                                              border: InputBorder.none,
-                                              isDense: true,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 11,
-                                                  ),
-                                              suffixIcon:
-                                                  controller.text.isEmpty
-                                                  ? null
-                                                  : IconButton(
-                                                      onPressed: _clearComposer,
-                                                      tooltip: 'Clear message',
-                                                      visualDensity:
-                                                          VisualDensity.compact,
-                                                      icon: const Icon(
-                                                        Icons.cancel_rounded,
-                                                        size: 18,
-                                                        color: Color(
-                                                          0xFF9A92A3,
-                                                        ),
-                                                      ),
-                                                    ),
-                                              suffixIconConstraints:
-                                                  const BoxConstraints(
-                                                    minWidth: 34,
-                                                    minHeight: 34,
-                                                  ),
-                                            ),
-                                            onSubmitted: (_) => send(),
-                                          ),
-                                        ),
-                                      ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: voiceInputMode
-                                          ? null
-                                          : _toggleEmojiPicker,
-                                      tooltip: showEmojiPicker
-                                          ? 'Close emoji picker'
-                                          : 'Open emoji picker',
-                                      style: IconButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF5F3F86,
-                                        ),
-                                      ),
-                                      icon: Icon(
-                                        showEmojiPicker
-                                            ? Icons
-                                                  .sentiment_satisfied_alt_rounded
-                                            : Icons
-                                                  .sentiment_satisfied_alt_outlined,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: uploading
-                                          ? null
-                                          : _showImageSource,
-                                      tooltip: 'More',
-                                      style: IconButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF5F3F86,
-                                        ),
-                                      ),
-                                      icon: uploading
-                                          ? const SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.add_circle_outline_rounded,
-                                              size: 25,
-                                            ),
-                                    ),
-                                    if (!voiceInputMode &&
-                                        controller.text.trim().isNotEmpty)
-                                      IconButton.filled(
-                                        visualDensity: VisualDensity.compact,
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFF7653A5,
-                                          ),
-                                          foregroundColor: Colors.white,
-                                          disabledBackgroundColor: const Color(
-                                            0xFFD9CDE8,
-                                          ),
-                                          disabledForegroundColor:
-                                              Colors.white70,
-                                        ),
-                                        onPressed: uploading || sending
-                                            ? null
-                                            : send,
-                                        tooltip: sending
-                                            ? 'Sending message'
-                                            : 'Send message',
-                                        icon: sending
-                                            ? const SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2.2,
-                                                      color: Colors.white,
-                                                    ),
-                                              )
-                                            : const Icon(
-                                                Icons.send_rounded,
-                                                size: 19,
-                                              ),
-                                      ),
-                                  ],
-                                ),
-                        ),
-                        if (showEmojiPicker)
-                          ChatEmojiPicker(onSelected: _insertEmoji),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
-        Positioned(
-          right: 18,
-          bottom: 92,
-          child: AnimatedScale(
-            scale: showJumpToLatest ? 1 : 0,
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutBack,
-            child: Material(
-              color: Colors.white,
-              elevation: 4,
-              shadowColor: const Color(0x33000000),
-              borderRadius: BorderRadius.circular(22),
-              child: InkWell(
-                onTap: _jumpToLatest,
-                borderRadius: BorderRadius.circular(22),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: Color(0xFF7653A5),
-                      ),
-                      if (newerMessagesBelow > 0) ...[
-                        const SizedBox(width: 2),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          transitionBuilder: (child, animation) =>
-                              ScaleTransition(scale: animation, child: child),
-                          child: Text(
-                            newerMessagesBelow > 99
-                                ? '99+'
-                                : '$newerMessagesBelow',
-                            key: ValueKey(newerMessagesBelow),
-                            style: const TextStyle(
-                              color: Color(0xFF7653A5),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
-    ),
-    bottomNavigationBar: !selectionMode
-        ? null
-        : _SelectionToolbar(
-            count: selectedMessageIds.length,
-            hasSelection: selectedMessageIds.isNotEmpty,
-            hasTextSelection: _selectedDocuments.any(
-              (document) =>
-                  (document.data()['text'] as String? ?? '').trim().isNotEmpty,
-            ),
-            onClose: _exitSelectionMode,
-            onSelectAll: _selectAllMessages,
-            onReply: _replyToSelected,
-            onCopy: _copySelected,
-            onCopyWithTime: _copySelectedWithTime,
-            onSave: _saveSelected,
-            onPin: _pinSelected,
-            onForward: _forwardSelected,
-            onDelete: _showSelectedDeleteOptions,
-          ),
-  );
+        bottomNavigationBar: !selectionMode
+            ? null
+            : _SelectionToolbar(
+                count: selectedMessageIds.length,
+                hasSelection: selectedMessageIds.isNotEmpty,
+                hasTextSelection: _selectedDocuments.any(
+                  (document) => (document.data()['text'] as String? ?? '')
+                      .trim()
+                      .isNotEmpty,
+                ),
+                onClose: _exitSelectionMode,
+                onSelectAll: _selectAllMessages,
+                onReply: _replyToSelected,
+                onCopy: _copySelected,
+                onCopyWithTime: _copySelectedWithTime,
+                onSave: _saveSelected,
+                onPin: _pinSelected,
+                onForward: _forwardSelected,
+                onDelete: _showSelectedDeleteOptions,
+              ),
+      ),
+    );
+  }
 
   void _installFloatingPetOverlay() {
     if (!mounted || floatingPetOverlayEntry != null) return;
@@ -2107,69 +2025,62 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
 
   Widget _buildFloatingPetOverlay(BuildContext overlayContext) =>
       Positioned.fill(
-        child: StreamBuilder<SharedPet?>(
-          stream: sharedPetService.watchSharedPetWith(widget.user.uid),
-          builder: (context, snapshot) {
-            final pet = snapshot.data;
-            if (pet == null) {
-              return const IgnorePointer(child: SizedBox.expand());
-            }
+        child: _petState.sharedPet == null
+            ? const IgnorePointer(child: SizedBox.expand())
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  const petHitSize = 108.0;
+                  const visibleGrip = 20.0;
 
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                const petHitSize = 108.0;
-                const visibleGrip = 20.0;
+                  final minX = -(petHitSize - visibleGrip);
+                  final minY = -(petHitSize - visibleGrip);
+                  final maxX = constraints.maxWidth - visibleGrip;
+                  final maxY = constraints.maxHeight - visibleGrip;
 
-                final minX = -(petHitSize - visibleGrip);
-                final minY = -(petHitSize - visibleGrip);
-                final maxX = constraints.maxWidth - visibleGrip;
-                final maxY = constraints.maxHeight - visibleGrip;
+                  final left = (minX + floatingPetAnchor.dx * (maxX - minX))
+                      .clamp(minX, maxX)
+                      .toDouble();
+                  final top = (minY + floatingPetAnchor.dy * (maxY - minY))
+                      .clamp(minY, maxY)
+                      .toDouble();
 
-                final left = (minX + floatingPetAnchor.dx * (maxX - minX))
-                    .clamp(minX, maxX)
-                    .toDouble();
-                final top = (minY + floatingPetAnchor.dy * (maxY - minY))
-                    .clamp(minY, maxY)
-                    .toDouble();
+                  if (!floatingPetVisible) {
+                    return const IgnorePointer(child: SizedBox.expand());
+                  }
 
-                if (!floatingPetVisible) {
-                  return const IgnorePointer(child: SizedBox.expand());
-                }
+                  return Stack(
+                    children: [
+                      Positioned(
+                        left: left,
+                        top: top,
+                        child: FloatingPetActor(
+                          visualSize: 92,
+                          hitSize: 108,
+                          onTap: () =>
+                              _showFloatingPetMenu(_petState.sharedPet!),
+                          onDragUpdate: (delta) {
+                            final nextX = (left + delta.dx)
+                                .clamp(minX, maxX)
+                                .toDouble();
+                            final nextY = (top + delta.dy)
+                                .clamp(minY, maxY)
+                                .toDouble();
 
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: left,
-                      top: top,
-                      child: FloatingPetActor(
-                        visualSize: 92,
-                        hitSize: 108,
-                        onTap: () => _showFloatingPetMenu(pet),
-                        onDragUpdate: (delta) {
-                          final nextX = (left + delta.dx)
-                              .clamp(minX, maxX)
-                              .toDouble();
-                          final nextY = (top + delta.dy)
-                              .clamp(minY, maxY)
-                              .toDouble();
-
-                          floatingPetAnchor = Offset(
-                            (nextX - minX) / (maxX - minX),
-                            (nextY - minY) / (maxY - minY),
-                          );
-
-                          // Rebuild only the OverlayEntry, not the whole chat.
-                          floatingPetOverlayEntry?.markNeedsBuild();
-                        },
-                        onDragEnd: _saveFloatingPetState,
+                            context.read<ChatPetCubit>().updateAnchor(
+                              Offset(
+                                (nextX - minX) / (maxX - minX),
+                                (nextY - minY) / (maxY - minY),
+                              ),
+                            );
+                            floatingPetOverlayEntry?.markNeedsBuild();
+                          },
+                          onDragEnd: _saveFloatingPetState,
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        ),
+                    ],
+                  );
+                },
+              ),
       );
 
   Future<void> _showFloatingPetMenu(SharedPet pet) async {
@@ -2233,17 +2144,17 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
 
   Future<void> _setFloatingPetVisible(bool value) async {
     if (!mounted) return;
-    floatingPetVisible = value;
+    context.read<ChatPetCubit>().setVisible(value);
     floatingPetOverlayEntry?.markNeedsBuild();
     await _saveFloatingPetState();
   }
 
   void _toggleEmojiPicker() {
     if (voiceInputMode) {
-      setState(() => voiceInputMode = false);
+      context.read<ChatComposerCubit>().setVoiceInputMode(false);
     }
     if (!showEmojiPicker) FocusScope.of(context).unfocus();
-    setState(() => showEmojiPicker = !showEmojiPicker);
+    context.read<ChatComposerCubit>().toggleEmojiPicker();
   }
 
   void _clearComposer() {
@@ -2487,198 +2398,189 @@ class _RealChatRoomPageState extends State<RealChatRoomPage> {
   }
 
   void _showChatMenu() {
+    final preferencesCubit = context.read<ChatPreferencesCubit>();
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => StreamBuilder<Map<String, dynamic>>(
-        stream: contactDetailService.preferences(widget.user.uid),
-        builder: (_, snapshot) {
-          final muted = snapshot.data?['muted'] as bool? ?? false;
-          final pinned = snapshot.data?['pinned'] as bool? ?? false;
-          return SafeArea(
-  child: SingleChildScrollView(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-                ListTile(
-                  leading: const Icon(Icons.person_rounded),
-                  title: const Text('Contact info'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _openContactDetails();
-                  },
+      builder: (sheetContext) => BlocProvider.value(
+        value: preferencesCubit,
+        child: BlocBuilder<ChatPreferencesCubit, ChatPreferencesState>(
+          builder: (_, state) {
+            final muted = state.muted;
+            final pinned = state.pinned;
+            return SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.person_rounded),
+                      title: const Text('Contact info'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _openContactDetails();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.pets_rounded),
+                      title: const Text('Raise a Pet Together'),
+                      subtitle: const Text('Send a shared-pet invitation'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showPetInviteDialog();
+                      },
+                    ),
+                    ListTile(
+                      leading: Icon(
+                        floatingPetVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                      ),
+                      title: Text(floatingPetVisible ? 'Hide pet' : 'Show pet'),
+                      subtitle: Text(
+                        floatingPetVisible
+                            ? 'Remove Mochi from this chat screen'
+                            : 'Show Mochi on this chat screen',
+                      ),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _setFloatingPetVisible(!floatingPetVisible);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.perm_media_rounded),
+                      title: const Text('Photos, files and voice'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _openSharedMedia();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.bookmark_rounded),
+                      title: const Text('Saved messages'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SavedMessagesPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    SwitchListTile(
+                      secondary: Icon(
+                        pinned
+                            ? Icons.push_pin_rounded
+                            : Icons.push_pin_outlined,
+                      ),
+                      title: const Text('Pin conversation'),
+                      subtitle: Text(
+                        pinned ? 'Pinned to the top' : 'Not pinned',
+                      ),
+                      value: pinned,
+                      activeTrackColor: const Color(0xFFB593E4),
+                      onChanged: preferencesCubit.setPinned,
+                    ),
+                    SwitchListTile(
+                      secondary: Icon(
+                        muted
+                            ? Icons.notifications_off_rounded
+                            : Icons.notifications_none_rounded,
+                      ),
+                      title: const Text('Mute notifications'),
+                      subtitle: Text(muted ? 'Muted' : 'Notifications are on'),
+                      value: muted,
+                      activeTrackColor: const Color(0xFFB593E4),
+                      onChanged: preferencesCubit.setMuted,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.mark_chat_unread_outlined),
+                      title: const Text('Mark as unread'),
+                      subtitle: const Text('Show this chat in the unread list'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _markConversationUnread();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.first_page_rounded),
+                      title: const Text('Jump to first message'),
+                      subtitle: const Text('Go to the oldest loaded message'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        if (!messageScrollController.hasClients) return;
+                        messageScrollController.animateTo(
+                          messageScrollController.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 420),
+                          curve: Curves.easeOutCubic,
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.calendar_month_outlined),
+                      title: const Text('Jump to date'),
+                      subtitle: const Text(
+                        'Find a message around a loaded date',
+                      ),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _jumpToDate();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.wallpaper_rounded),
+                      title: const Text('Chat background'),
+                      subtitle: Text(
+                        'Background for your chat with ${widget.user.name}',
+                      ),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _openChatBackground();
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.palette_outlined),
+                      title: const Text('Fallback color'),
+                      subtitle: const Text(
+                        'Used when no image background is selected',
+                      ),
+                      trailing: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: _chatBackgroundColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFD5CFDA)),
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _showBackgroundPicker();
+                      },
+                    ),
+                    const Divider(height: 8),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.delete_sweep_outlined,
+                        color: Color(0xFFB14E68),
+                      ),
+                      title: const Text(
+                        'Clear chat history',
+                        style: TextStyle(color: Color(0xFFB14E68)),
+                      ),
+                      subtitle: const Text('Only clears messages for you'),
+                      onTap: () {
+                        Navigator.pop(sheetContext);
+                        _clearChatHistory();
+                      },
+                    ),
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.pets_rounded),
-                  title: const Text('Raise a Pet Together'),
-                  subtitle: const Text('Send a shared-pet invitation'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _showPetInviteDialog();
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    floatingPetVisible
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                  ),
-                  title: Text(floatingPetVisible ? 'Hide pet' : 'Show pet'),
-                  subtitle: Text(
-                    floatingPetVisible
-                        ? 'Remove Mochi from this chat screen'
-                        : 'Show Mochi on this chat screen',
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _setFloatingPetVisible(!floatingPetVisible);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.perm_media_rounded),
-                  title: const Text('Photos, files and voice'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _openSharedMedia();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.bookmark_rounded),
-                  title: const Text('Saved messages'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => SavedMessagesPage()),
-                    );
-                  },
-                ),
-                SwitchListTile(
-                  secondary: Icon(
-                    pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                  ),
-                  title: const Text('Pin conversation'),
-                  subtitle: Text(pinned ? 'Pinned to the top' : 'Not pinned'),
-                  value: pinned,
-                  activeTrackColor: const Color(0xFFB593E4),
-                  onChanged: (value) => contactDetailService.setPreference(
-                    widget.user.uid,
-                    'pinned',
-                    value,
-                  ),
-                ),
-                SwitchListTile(
-                  secondary: Icon(
-                    muted
-                        ? Icons.notifications_off_rounded
-                        : Icons.notifications_none_rounded,
-                  ),
-                  title: const Text('Mute notifications'),
-                  subtitle: Text(muted ? 'Muted' : 'Notifications are on'),
-                  value: muted,
-                  activeTrackColor: const Color(0xFFB593E4),
-                  onChanged: (value) => contactDetailService.setPreference(
-                    widget.user.uid,
-                    'muted',
-                    value,
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.mark_chat_unread_outlined),
-                  title: const Text('Mark as unread'),
-                  subtitle: const Text('Show this chat in the unread list'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _markConversationUnread();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.first_page_rounded),
-                  title: const Text('Jump to first message'),
-                  subtitle: const Text('Go to the oldest loaded message'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    if (!messageScrollController.hasClients) return;
-                    messageScrollController.animateTo(
-                      messageScrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 420),
-                      curve: Curves.easeOutCubic,
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.calendar_month_outlined),
-                  title: const Text('Jump to date'),
-                  subtitle: const Text('Find a message around a loaded date'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _jumpToDate();
-                  },
-                ),
-                ListTile(
-  leading: const Icon(
-    Icons.wallpaper_rounded,
-  ),
-  title: const Text(
-    'Chat background',
-  ),
-  subtitle: Text(
-    'Background for your chat with ${widget.user.name}',
-  ),
-  onTap: () {
-    Navigator.pop(sheetContext);
-    _openChatBackground();
-  },
-),
-ListTile(
-  leading: const Icon(
-    Icons.palette_outlined,
-  ),
-  title: const Text(
-    'Fallback color',
-  ),
-  subtitle: const Text(
-    'Used when no image background is selected',
-  ),
-  trailing: Container(
-    width: 24,
-    height: 24,
-    decoration: BoxDecoration(
-      color: _chatBackgroundColor,
-      shape: BoxShape.circle,
-      border: Border.all(
-        color: const Color(
-          0xFFD5CFDA,
+              ),
+            );
+          },
         ),
-      ),
-    ),
-  ),
-  onTap: () {
-    Navigator.pop(sheetContext);
-    _showBackgroundPicker();
-  },
-),
-                const Divider(height: 8),
-                ListTile(
-                  leading: const Icon(
-                    Icons.delete_sweep_outlined,
-                    color: Color(0xFFB14E68),
-                  ),
-                  title: const Text(
-                    'Clear chat history',
-                    style: TextStyle(color: Color(0xFFB14E68)),
-                  ),
-                  subtitle: const Text('Only clears messages for you'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _clearChatHistory();
-                  },
-                ),
-              ],
-            ),
-  ),
-          );
-        },
       ),
     );
   }
@@ -2721,7 +2623,9 @@ ListTile(
                         color: choice.$3,
                         selected: chatBackground == choice.$1,
                         onTap: () async {
-                          setState(() => chatBackground = choice.$1);
+                          context.read<ChatBackgroundCubit>().setFallbackColor(
+                            choice.$1,
+                          );
                           Navigator.pop(sheetContext);
                           await contactDetailService.setChatBackground(
                             widget.user.uid,
@@ -2757,10 +2661,9 @@ ListTile(
     if (!confirmed) return;
     try {
       await service.clearForMe(widget.user.uid);
-      olderMessages.clear();
-      hasMoreOlderMessages = true;
+      if (!mounted) return;
+      context.read<ChatMessagesBloc>().add(const ChatMessagesPagingReset());
       if (mounted) {
-        setState(() {});
         _notice('Chat history cleared');
       }
     } catch (_) {
@@ -2805,8 +2708,11 @@ ListTile(
       return;
     }
 
-    historyJumpTargetId = messageId;
-    if (mounted) setState(() {});
+    if (!mounted) return;
+
+    context.read<ChatMessagesBloc>().add(
+      ChatMessagesHistoryTargetChanged(messageId),
+    );
 
     try {
       // Continue paging backward until the referenced message becomes part
@@ -2825,8 +2731,11 @@ ListTile(
 
       await _showOriginalMessageFromHistory(messageId);
     } finally {
-      historyJumpTargetId = null;
-      if (mounted) setState(() {});
+      if (mounted) {
+        context.read<ChatMessagesBloc>().add(
+          const ChatMessagesHistoryTargetChanged(null),
+        );
+      }
     }
   }
 
@@ -2844,10 +2753,14 @@ ListTile(
         .toDouble();
 
     highlightTimer?.cancel();
-    setState(() => highlightedMessageId = messageId);
+    context.read<ChatMessagesBloc>().add(
+      ChatMessagesHighlightChanged(messageId),
+    );
     highlightTimer = Timer(const Duration(milliseconds: 1500), () {
       if (mounted && highlightedMessageId == messageId) {
-        setState(() => highlightedMessageId = null);
+        context.read<ChatMessagesBloc>().add(
+          const ChatMessagesHighlightChanged(null),
+        );
       }
     });
 
@@ -2930,19 +2843,30 @@ ListTile(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: const ['👍', '❤️', '😂', '😮', '😢', '🙏']
-                      .map(
-                        (emoji) => InkWell(
-                          borderRadius: BorderRadius.circular(22),
-                          onTap: () =>
-                              Navigator.pop(sheetContext, 'react:$emoji'),
-                          child: Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Text(emoji, style: TextStyle(fontSize: 24)),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                  children:
+                      const [
+                            'Ã°Å¸â€˜Â',
+                            'Ã¢ÂÂ¤Ã¯Â¸Â',
+                            'Ã°Å¸Ëœâ€š',
+                            'Ã°Å¸ËœÂ®',
+                            'Ã°Å¸ËœÂ¢',
+                            'Ã°Å¸â„¢Â',
+                          ]
+                          .map(
+                            (emoji) => InkWell(
+                              borderRadius: BorderRadius.circular(22),
+                              onTap: () =>
+                                  Navigator.pop(sheetContext, 'react:$emoji'),
+                              child: Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Text(
+                                  emoji,
+                                  style: TextStyle(fontSize: 24),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
                 ),
                 const Divider(height: 18),
                 Row(
@@ -3264,19 +3188,11 @@ ListTile(
   }
 
   void _toggleSelection(String messageId) {
-    setState(() {
-      selectionMode = true;
-      selectedMessageIds.contains(messageId)
-          ? selectedMessageIds.remove(messageId)
-          : selectedMessageIds.add(messageId);
-    });
+    context.read<ChatSelectionCubit>().toggle(messageId);
   }
 
   void _exitSelectionMode() {
-    setState(() {
-      selectionMode = false;
-      selectedMessageIds.clear();
-    });
+    context.read<ChatSelectionCubit>().exit();
   }
 
   Future<void> _editMessage(String messageId, String original) async {
@@ -3430,17 +3346,7 @@ ListTile(
       .toSet();
 
   void _selectAllMessages() {
-    final selectableIds = _selectableMessageIds;
-    setState(() {
-      if (selectedMessageIds.length == selectableIds.length &&
-          selectedMessageIds.containsAll(selectableIds)) {
-        selectedMessageIds.clear();
-      } else {
-        selectedMessageIds
-          ..clear()
-          ..addAll(selectableIds);
-      }
-    });
+    context.read<ChatSelectionCubit>().toggleAll(_selectableMessageIds);
   }
 
   void _replyToSelected() {
@@ -3448,16 +3354,14 @@ ListTile(
     final document = _selectedDocuments.single;
     final data = document.data();
     final mine = data['senderId'] == service.myId;
-    setState(() {
-      selectionMode = false;
-      selectedMessageIds.clear();
-      replyingTo = MessageReply.fromMessage(
+    context.read<ChatSelectionCubit>().exit();
+    context.read<ChatComposerCubit>().setReply(
+      MessageReply.fromMessage(
         messageId: document.id,
         data: data,
         senderName: mine ? 'You' : widget.user.name,
-      );
-      showEmojiPicker = false;
-    });
+      ),
+    );
   }
 
   Future<void> _copySelected() async {
@@ -3746,7 +3650,7 @@ ListTile(
   }
 
   String _dateLabel(DateTime? value) {
-    if (value == null) return 'Sending…';
+    if (value == null) return 'SendingÃ¢â‚¬Â¦';
     final date = value.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
