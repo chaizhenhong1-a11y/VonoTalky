@@ -3,28 +3,16 @@ import 'package:flutter/material.dart';
 import '../models/time_capsule_item.dart';
 import '../utils/time_capsule_date.dart';
 
-enum TimeCapsuleCollectionActionType {
-  create,
-  select,
-}
+enum TimeCapsuleCollectionActionType { create, select }
 
 class TimeCapsuleCollectionResult {
-  const TimeCapsuleCollectionResult._({
-    required this.type,
-    this.capsule,
-  });
+  const TimeCapsuleCollectionResult._({required this.type, this.capsule});
 
   const TimeCapsuleCollectionResult.create()
-      : this._(
-          type: TimeCapsuleCollectionActionType.create,
-        );
+    : this._(type: TimeCapsuleCollectionActionType.create);
 
-  const TimeCapsuleCollectionResult.select(
-    TimeCapsuleItem capsule,
-  ) : this._(
-          type: TimeCapsuleCollectionActionType.select,
-          capsule: capsule,
-        );
+  const TimeCapsuleCollectionResult.select(TimeCapsuleItem capsule)
+    : this._(type: TimeCapsuleCollectionActionType.select, capsule: capsule);
 
   final TimeCapsuleCollectionActionType type;
   final TimeCapsuleItem? capsule;
@@ -46,9 +34,7 @@ Future<TimeCapsuleCollectionResult?> showTimeCapsuleCollectionSheet({
         ),
         decoration: const BoxDecoration(
           color: Color(0xFFFFFCF6),
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(30),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
         child: SafeArea(
           top: false,
@@ -146,9 +132,9 @@ Future<TimeCapsuleCollectionResult?> showTimeCapsuleCollectionSheet({
                         child: InkWell(
                           borderRadius: BorderRadius.circular(20),
                           onTap: () {
-                            Navigator.of(sheetContext).pop(
-                              TimeCapsuleCollectionResult.select(capsule),
-                            );
+                            Navigator.of(
+                              sheetContext,
+                            ).pop(TimeCapsuleCollectionResult.select(capsule));
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -224,9 +210,9 @@ Future<TimeCapsuleCollectionResult?> showTimeCapsuleCollectionSheet({
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: () {
-                      Navigator.of(sheetContext).pop(
-                        const TimeCapsuleCollectionResult.create(),
-                      );
+                      Navigator.of(
+                        sheetContext,
+                      ).pop(const TimeCapsuleCollectionResult.create());
                     },
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF71835E),

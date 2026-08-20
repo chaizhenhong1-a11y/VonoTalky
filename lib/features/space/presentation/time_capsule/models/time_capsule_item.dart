@@ -16,11 +16,7 @@ class TimeCapsuleItem {
   bool isUnlocked([DateTime? now]) {
     final current = now ?? DateTime.now();
 
-    final today = DateTime(
-      current.year,
-      current.month,
-      current.day,
-    );
+    final today = DateTime(current.year, current.month, current.day);
 
     final unlockDay = DateTime(
       unlockDate.year,

@@ -19,10 +19,7 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
 
   bool writing = false;
 
-  Future<void> _perform(
-    SharedPetAction action, {
-    int? currentEnergy,
-  }) async {
+  Future<void> _perform(SharedPetAction action, {int? currentEnergy}) async {
     if (writing) return;
 
     if (action == SharedPetAction.play &&
@@ -84,10 +81,7 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
             children: [
               const Text(
                 'Rename pet',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -184,10 +178,8 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
                       child: _RequestButton(
                         icon: Icons.restaurant_rounded,
                         label: 'Feed',
-                        onTap: () => _sendCareRequest(
-                          friendId: friendId,
-                          type: 'feed',
-                        ),
+                        onTap: () =>
+                            _sendCareRequest(friendId: friendId, type: 'feed'),
                       ),
                     ),
                     const SizedBox(width: 9),
@@ -195,10 +187,8 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
                       child: _RequestButton(
                         icon: Icons.sports_esports_rounded,
                         label: 'Play',
-                        onTap: () => _sendCareRequest(
-                          friendId: friendId,
-                          type: 'play',
-                        ),
+                        onTap: () =>
+                            _sendCareRequest(friendId: friendId, type: 'play'),
                       ),
                     ),
                     const SizedBox(width: 9),
@@ -206,10 +196,8 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
                       child: _RequestButton(
                         icon: Icons.favorite_rounded,
                         label: 'Pet',
-                        onTap: () => _sendCareRequest(
-                          friendId: friendId,
-                          type: 'pet',
-                        ),
+                        onTap: () =>
+                            _sendCareRequest(friendId: friendId, type: 'pet'),
                       ),
                     ),
                   ],
@@ -431,9 +419,7 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
               _PetHeroCard(
                 pet: pet,
                 mood: mood,
-                onTapPet: writing
-                    ? null
-                    : () => _perform(SharedPetAction.pet),
+                onTapPet: writing ? null : () => _perform(SharedPetAction.pet),
               ),
               const SizedBox(height: 14),
               Row(
@@ -469,25 +455,18 @@ class _SharedPetDetailPageState extends State<SharedPetDetailPage> {
               const SizedBox(height: 14),
               _ActionRow(
                 disabled: writing,
-                playDisabled:
-                    energy < SharedPetService.minimumPlayEnergy,
+                playDisabled: energy < SharedPetService.minimumPlayEnergy,
                 onFeed: () => _perform(SharedPetAction.feed),
                 onPet: () => _perform(SharedPetAction.pet),
-                onPlay: () => _perform(
-                  SharedPetAction.play,
-                  currentEnergy: energy,
-                ),
+                onPlay: () =>
+                    _perform(SharedPetAction.play, currentEnergy: energy),
               ),
               if (energy < SharedPetService.minimumPlayEnergy) ...[
                 const SizedBox(height: 8),
                 _LowEnergyHint(petName: pet.petName),
               ],
               const SizedBox(height: 14),
-              _LevelCard(
-                level: pet.level,
-                xp: pet.xp,
-                progress: xpProgress,
-              ),
+              _LevelCard(level: pet.level, xp: pet.xp, progress: xpProgress),
               const SizedBox(height: 12),
               _StreakCard(
                 streakDays: pet.streakDays,
@@ -531,15 +510,10 @@ class _PetHeroCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            colors.primary.withValues(alpha: .08),
-            colors.surface,
-          ],
+          colors: [colors.primary.withValues(alpha: .08), colors.surface],
         ),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(
-          color: colors.primary.withValues(alpha: .10),
-        ),
+        border: Border.all(color: colors.primary.withValues(alpha: .10)),
       ),
       child: Stack(
         children: [
@@ -547,10 +521,7 @@ class _PetHeroCard extends StatelessWidget {
             top: 18,
             left: 18,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 11,
-                vertical: 7,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
               decoration: BoxDecoration(
                 color: colors.surface.withValues(alpha: .92),
                 borderRadius: BorderRadius.circular(16),
@@ -616,9 +587,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .45),
-        ),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
@@ -715,9 +684,7 @@ class _ActionButton extends StatelessWidget {
       label: Text(label),
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -740,11 +707,7 @@ class _LowEnergyHint extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.bedtime_outlined,
-            size: 17,
-            color: colors.primary,
-          ),
+          Icon(Icons.bedtime_outlined, size: 17, color: colors.primary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -811,8 +774,7 @@ class _LevelCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: progress,
                     minHeight: 7,
-                    backgroundColor:
-                        colors.surfaceContainerHighest,
+                    backgroundColor: colors.surfaceContainerHighest,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -864,9 +826,7 @@ class _StreakCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: atRisk
-            ? const Color(0xFFFFF4EA)
-            : colors.surface,
+        color: atRisk ? const Color(0xFFFFF4EA) : colors.surface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -978,10 +938,7 @@ class _IncomingCareTile extends StatelessWidget {
             onPressed: onDismiss,
             icon: const Icon(Icons.close_rounded, size: 18),
           ),
-          FilledButton(
-            onPressed: onComplete,
-            child: const Text('Done'),
-          ),
+          FilledButton(onPressed: onComplete, child: const Text('Done')),
         ],
       ),
     );

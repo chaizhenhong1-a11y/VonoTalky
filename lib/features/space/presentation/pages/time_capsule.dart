@@ -69,17 +69,11 @@ class _ShiJianJiaoNangState extends State<TimeCapsule> {
 
   Future<void> _handleCapsuleTap(TimeCapsuleItem capsule) async {
     if (!capsule.isUnlocked()) {
-      await showLockedTimeCapsuleSheet(
-        context: context,
-        capsule: capsule,
-      );
+      await showLockedTimeCapsuleSheet(context: context, capsule: capsule);
       return;
     }
 
-    await showOpenTimeCapsuleSheet(
-      context: context,
-      capsule: capsule,
-    );
+    await showOpenTimeCapsuleSheet(context: context, capsule: capsule);
   }
 
   @override
@@ -127,10 +121,9 @@ class _ShiJianJiaoNangState extends State<TimeCapsule> {
             child: Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Material(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surface
-                    .withValues(alpha: 0.90),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.90),
                 borderRadius: BorderRadius.circular(100),
                 elevation: 2,
                 child: InkWell(
@@ -139,10 +132,7 @@ class _ShiJianJiaoNangState extends State<TimeCapsule> {
                     showFriendTreeListSheet(context);
                   },
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
-                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

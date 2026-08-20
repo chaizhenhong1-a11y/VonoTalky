@@ -15,9 +15,7 @@ Future<void> showLockedTimeCapsuleSheet({
         padding: const EdgeInsets.fromLTRB(24, 26, 24, 30),
         decoration: const BoxDecoration(
           color: Color(0xFFFFFCF6),
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(30),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
         child: SafeArea(
           top: false,

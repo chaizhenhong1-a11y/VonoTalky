@@ -8,10 +8,7 @@ import '../tree_tags/widgets/tree_tag_layer.dart';
 import '../widgets/shared_space_background.dart';
 
 class FriendTreePage extends StatefulWidget {
-  const FriendTreePage({
-    super.key,
-    required this.user,
-  });
+  const FriendTreePage({super.key, required this.user});
 
   final ChatUser user;
 
@@ -27,16 +24,11 @@ class _FriendTreePageState extends State<FriendTreePage> {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
     if (currentUserId == null) {
-      return const Scaffold(
-        body: Center(child: Text('请先登录')),
-      );
+      return const Scaffold(body: Center(child: Text('请先登录')));
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.user.name} 的树'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text('${widget.user.name} 的树'), centerTitle: true),
       body: Stack(
         children: [
           const Positioned.fill(
@@ -79,10 +71,9 @@ class _FriendTreePageState extends State<FriendTreePage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withValues(alpha: 0.86),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.86),
                     borderRadius: BorderRadius.circular(100),
                     boxShadow: const [
                       BoxShadow(

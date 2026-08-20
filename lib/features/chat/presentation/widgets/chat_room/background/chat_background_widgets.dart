@@ -55,6 +55,7 @@ class _BackgroundChoice extends StatelessWidget {
     );
   }
 }
+
 class _ChatBackgroundSwitcher extends StatefulWidget {
   const _ChatBackgroundSwitcher({
     required this.otherName,
@@ -73,8 +74,7 @@ class _ChatBackgroundSwitcher extends StatefulWidget {
       _ChatBackgroundSwitcherState();
 }
 
-class _ChatBackgroundSwitcherState
-    extends State<_ChatBackgroundSwitcher> {
+class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
   Timer? _hintTimer;
   bool _showHint = false;
 
@@ -85,8 +85,7 @@ class _ChatBackgroundSwitcherState
   }
 
   void _handleTap() {
-    final viewingOther =
-        widget.viewMode == ChatBackgroundViewMode.other;
+    final viewingOther = widget.viewMode == ChatBackgroundViewMode.other;
 
     if (viewingOther) {
       _hideHint();
@@ -133,8 +132,7 @@ class _ChatBackgroundSwitcherState
 
   @override
   Widget build(BuildContext context) {
-    final viewingOther =
-        widget.viewMode == ChatBackgroundViewMode.other;
+    final viewingOther = widget.viewMode == ChatBackgroundViewMode.other;
 
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -147,10 +145,7 @@ class _ChatBackgroundSwitcherState
           Positioned(
             top: 0,
             right: 0,
-            child: _buildButton(
-              colorScheme,
-              viewingOther,
-            ),
+            child: _buildButton(colorScheme, viewingOther),
           ),
 
           Positioned(
@@ -162,9 +157,7 @@ class _ChatBackgroundSwitcherState
                 duration: const Duration(milliseconds: 160),
                 curve: Curves.easeOut,
                 child: AnimatedSlide(
-                  offset: _showHint
-                      ? Offset.zero
-                      : const Offset(0, -0.12),
+                  offset: _showHint ? Offset.zero : const Offset(0, -0.12),
                   duration: const Duration(milliseconds: 180),
                   curve: Curves.easeOutCubic,
                   child: _buildHint(colorScheme),
@@ -177,10 +170,7 @@ class _ChatBackgroundSwitcherState
     );
   }
 
-  Widget _buildButton(
-    ColorScheme colorScheme,
-    bool viewingOther,
-  ) {
+  Widget _buildButton(ColorScheme colorScheme, bool viewingOther) {
     return SizedBox(
       width: 132,
       height: 42,
@@ -266,10 +256,7 @@ class _ChatBackgroundSwitcherState
   Widget _buildHint(ColorScheme colorScheme) {
     return Container(
       width: 240,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: colorScheme.inverseSurface.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(14),

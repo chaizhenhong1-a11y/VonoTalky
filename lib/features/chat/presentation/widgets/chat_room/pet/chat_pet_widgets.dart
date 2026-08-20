@@ -16,9 +16,7 @@ class _PetQuickAction extends StatelessWidget {
     final disabled = onTap == null;
 
     return Material(
-      color: disabled
-          ? const Color(0xFFF4F1F4)
-          : const Color(0xFFFFF0F5),
+      color: disabled ? const Color(0xFFF4F1F4) : const Color(0xFFFFF0F5),
       borderRadius: BorderRadius.circular(19),
       child: InkWell(
         onTap: onTap,
@@ -84,10 +82,7 @@ class _PetInviteBanner extends StatelessWidget {
           const CircleAvatar(
             radius: 21,
             backgroundColor: Colors.white,
-            child: Icon(
-              Icons.pets_rounded,
-              color: Color(0xFF9B6CC5),
-            ),
+            child: Icon(Icons.pets_rounded, color: Color(0xFF9B6CC5)),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -120,10 +115,7 @@ class _PetInviteBanner extends StatelessWidget {
             IconButton(
               onPressed: onReject,
               tooltip: 'Decline',
-              icon: const Icon(
-                Icons.close_rounded,
-                color: Color(0xFF9B7C8C),
-              ),
+              icon: const Icon(Icons.close_rounded, color: Color(0xFF9B7C8C)),
             ),
             FilledButton(
               onPressed: onAccept,

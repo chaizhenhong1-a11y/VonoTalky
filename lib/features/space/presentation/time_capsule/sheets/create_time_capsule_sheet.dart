@@ -33,9 +33,7 @@ Future<TimeCapsuleDraft?> showCreateTimeCapsuleSheet({
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               decoration: const BoxDecoration(
                 color: Color(0xFFFFFCF6),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(30),
-                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -64,10 +62,7 @@ Future<TimeCapsuleDraft?> showCreateTimeCapsuleSheet({
                     const SizedBox(height: 5),
                     const Text(
                       '埋下以后，在指定日期以前无法打开。',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF918A7D),
-                      ),
+                      style: TextStyle(fontSize: 13, color: Color(0xFF918A7D)),
                     ),
                     const SizedBox(height: 24),
                     const Text(
@@ -173,9 +168,7 @@ Future<TimeCapsuleDraft?> showCreateTimeCapsuleSheet({
                               finalContent.isEmpty ||
                               unlockDate == null) {
                             ScaffoldMessenger.of(sheetContext).showSnackBar(
-                              const SnackBar(
-                                content: Text('标题、内容和开启日期都要填写'),
-                              ),
+                              const SnackBar(content: Text('标题、内容和开启日期都要填写')),
                             );
                             return;
                           }
@@ -225,10 +218,7 @@ InputDecoration _fieldDecoration(String hintText) {
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: const BorderSide(
-        color: Color(0xFF7E9067),
-        width: 1.4,
-      ),
+      borderSide: const BorderSide(color: Color(0xFF7E9067), width: 1.4),
     ),
   );
 }

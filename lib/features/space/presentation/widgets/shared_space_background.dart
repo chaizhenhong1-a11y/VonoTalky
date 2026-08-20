@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 import '../time_capsule/painters/time_capsule_scene_painter.dart';
 
 class SharedSpaceBackground extends StatefulWidget {
-  const SharedSpaceBackground({
-    super.key,
-    required this.pageAnimation,
-  });
+  const SharedSpaceBackground({super.key, required this.pageAnimation});
 
   final Animation<double> pageAnimation;
 
@@ -73,15 +70,11 @@ class _SharedSpaceBackgroundState extends State<SharedSpaceBackground>
                     height: viewportHeight + 50,
                     child: CustomPaint(
                       painter: TimeCapsuleScenePainter(
-  animationValue:
-      _windController.value,
-  hasCapsules:
-      false,
-  isNight:
-      isNight,
-  viewportWidth:
-      viewportWidth,
-)
+                        animationValue: _windController.value,
+                        hasCapsules: false,
+                        isNight: isNight,
+                        viewportWidth: viewportWidth,
+                      ),
                     ),
                   ),
                 ],

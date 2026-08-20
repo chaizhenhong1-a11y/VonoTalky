@@ -272,12 +272,13 @@ class _SettingsSignOutTileState extends State<_SettingsSignOutTile> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
+    return Material(
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: .65)),
+        side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .65)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: signingOut ? null : _signOut,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -337,16 +338,17 @@ class _SettingsCard extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surface,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(
+      side: BorderSide(
         color: Theme.of(
           context,
         ).colorScheme.outlineVariant.withValues(alpha: .5),
       ),
     ),
+    clipBehavior: Clip.antiAlias,
     child: Column(children: children),
   );
 }

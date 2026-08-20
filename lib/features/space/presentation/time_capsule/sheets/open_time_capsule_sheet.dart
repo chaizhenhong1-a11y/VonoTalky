@@ -20,9 +20,7 @@ Future<void> showOpenTimeCapsuleSheet({
         padding: const EdgeInsets.fromLTRB(24, 18, 24, 26),
         decoration: const BoxDecoration(
           color: Color(0xFFFFFCF6),
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(30),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
         child: SafeArea(
           top: false,
@@ -43,10 +41,7 @@ Future<void> showOpenTimeCapsuleSheet({
               const SizedBox(height: 22),
               Row(
                 children: [
-                  const Icon(
-                    Icons.drafts_outlined,
-                    color: Color(0xFF71835E),
-                  ),
+                  const Icon(Icons.drafts_outlined, color: Color(0xFF71835E)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../animation/pet_actor.dart';
-import '../../data/models/pet_invite.dart';
 import '../../data/models/shared_pet.dart';
-import '../../data/services/pet_invite_service.dart';
 import '../../data/services/shared_pet_service.dart';
 import 'shared_pet_detail_page.dart';
 
@@ -15,496 +12,384 @@ class PetHomePage extends StatefulWidget {
 }
 
 class _PetHomePageState extends State<PetHomePage> {
-  final SharedPetService service = SharedPetService();
-  final PetInviteService inviteService = PetInviteService();
+  final service = SharedPetService();
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: StreamBuilder<List<SharedPet>>(
-          stream: service.watchMyPets(),
-          builder: (context, snapshot) {
+      backgroundColor: Colors.transparent,
+      body: StreamBuilder<List<SharedPet>>(
+        stream: service.watchMyPets(),
+        builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _ErrorState(message: snapshot.error.toString());
             }
 
             if (!snapshot.hasData) {
-              return Center(
-                child: CircularProgressIndicator(color: colors.primary),
-              );
+              return const Center(child: CircularProgressIndicator());
             }
 
             final pets = snapshot.data!;
 
-            return CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(child: _header(context)),
-                SliverToBoxAdapter(child: _compactInviteBanner()),
-                if (pets.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyPetCenter(),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
-                    sliver: SliverList.separated(
-                      itemCount: pets.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        final pet = pets[index];
-                        return _SimplePetCard(
-                          pet: pet,
-                          myId: service.myId,
-                          onTap: () => _openPet(pet),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            );
-          },
+            if (pets.isEmpty) {
+              return const _EmptyPetCenter();
+            }
+
+          return _FixedPetHouseScene(onEnter: () => _enterHouse(pets));
+        },
+      ),
+    );
+  }
+
+  Future<void> _enterHouse(List<SharedPet> pets) async {
+    if (pets.isEmpty) return;
+
+    if (pets.length == 1) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SharedPetDetailPage(petId: pets.first.id),
         ),
-      ),
-    );
-  }
+      );
+      return;
+    }
 
-  Widget _header(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: .10),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.pets_rounded, color: colors.primary, size: 21),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pet Center',
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.45,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Pets you are raising with friends',
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _compactInviteBanner() {
-    return StreamBuilder<List<PetInvite>>(
-      stream: inviteService.watchMyPendingInvites(),
-      builder: (context, snapshot) {
-        final invites = snapshot.data ?? const <PetInvite>[];
-        if (invites.isEmpty) return const SizedBox(height: 2);
-
-        final incoming = invites
-            .where((invite) => invite.receiverId == inviteService.myId)
-            .toList();
-        final outgoing = invites
-            .where((invite) => invite.senderId == inviteService.myId)
-            .toList();
-
-        final colors = Theme.of(context).colorScheme;
-        final label = incoming.isNotEmpty
-            ? '${incoming.length} pet invitation${incoming.length == 1 ? '' : 's'}'
-            : '${outgoing.length} invitation${outgoing.length == 1 ? '' : 's'} waiting';
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 5, 16, 5),
-          child: Material(
-            color: colors.primary.withValues(alpha: .07),
-            borderRadius: BorderRadius.circular(17),
-            child: InkWell(
-              onTap: () => _showInvites(incoming, outgoing),
-              borderRadius: BorderRadius.circular(17),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      incoming.isNotEmpty
-                          ? Icons.mail_outline_rounded
-                          : Icons.schedule_rounded,
-                      size: 18,
-                      color: colors.primary,
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          color: colors.onSurface,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      size: 19,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showInvites(
-    List<PetInvite> incoming,
-    List<PetInvite> outgoing,
-  ) async {
-    await showModalBottomSheet<void>(
+    final selected = await showModalBottomSheet<SharedPet>(
       context: context,
       showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        final colors = Theme.of(sheetContext).colorScheme;
+      useSafeArea: true,
+      builder: (sheetContext) =>
+          _PetPickerSheet(pets: pets, myId: service.myId),
+    );
 
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pet invitations',
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
+    if (selected == null || !mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SharedPetDetailPage(petId: selected.id),
+      ),
+    );
+  }
+}
+
+class _PetPickerSheet extends StatelessWidget {
+  const _PetPickerSheet({required this.pets, required this.myId});
+
+  final List<SharedPet> pets;
+  final String myId;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: scheme.surface,
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+          children: [
+            const Text(
+              'Choose a pet',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Pick who you want to visit inside the Pet House.',
+              style: TextStyle(color: Color(0xFF8D828F), fontSize: 11),
+            ),
+            const SizedBox(height: 14),
+            ...pets.map(
+              (pet) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: scheme.primary.withValues(alpha: .06),
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    onTap: () => Navigator.pop(context, pet),
+                    leading: CircleAvatar(
+                      backgroundColor: scheme.primary.withValues(alpha: .12),
+                      child: Icon(Icons.pets_rounded, color: scheme.primary),
+                    ),
+                    title: Text(
+                      pet.petName,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      'with ${pet.friendName(myId)} · Lv.${pet.level}',
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
                   ),
                 ),
-                if (incoming.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  ...incoming.map(
-                    (invite) => _IncomingInviteTile(
-                      invite: invite,
-                      onAccept: () async {
-                        Navigator.pop(sheetContext);
-                        await _acceptInvite(invite);
-                      },
-                      onDecline: () async {
-                        Navigator.pop(sheetContext);
-                        await _rejectInvite(invite);
-                      },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FixedPetHouseScene extends StatelessWidget {
+  const _FixedPetHouseScene({required this.onEnter});
+
+  final VoidCallback onEnter;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final h = constraints.maxHeight;
+
+        // Larger than the previous version while still scaling safely on phones.
+        final houseHeight = (h * .54).clamp(300.0, 430.0);
+
+        const spaceTopInset = 116.0;
+        const backgroundTop = 50.0;
+        final spaceHeight = h + spaceTopInset;
+        final sharedCanvasHeight = spaceHeight + 50.0;
+
+        // Must stay identical to TimeCapsuleScenePainter:
+        // groundY = size.height * 0.72
+        final groundY =
+            backgroundTop + sharedCanvasHeight * .72 - spaceTopInset;
+
+        // The house illustration now sits directly on the shared ground,
+        // with no stepping-stone rows below it.
+        final sceneBottom = (h - groundY).clamp(0.0, h);
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: sceneBottom,
+              child: Center(
+                child: Semantics(
+                  button: true,
+                  label: 'Enter Pet House',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onEnter,
+                    child: SizedBox(
+                      height: houseHeight,
+                      width: houseHeight * 1.22,
+                      child: _PetHouseScene(primary: scheme.primary),
                     ),
                   ),
-                ],
-                if (outgoing.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  ...outgoing.map(
-                    (invite) => _OutgoingInviteTile(invite: invite),
-                  ),
-                ],
-              ],
+                ),
+              ),
             ),
-          ),
+            Positioned(
+              left: 0,
+              right: 0,
+              top: (groundY - houseHeight + 12).clamp(10.0, h),
+              child: const IgnorePointer(
+                child: Center(
+                  child: Text(
+                    'Tap house to enter',
+                    style: TextStyle(
+                      color: Color(0xFF726D65),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
   }
-
-  Future<void> _acceptInvite(PetInvite invite) async {
-    try {
-      await inviteService.acceptInvite(invite);
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('${invite.petName} was added to your Pet Center'),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(error.toString().replaceFirst('Bad state: ', '')),
-        ),
-      );
-    }
-  }
-
-  Future<void> _rejectInvite(PetInvite invite) async {
-    try {
-      await inviteService.rejectInvite(invite);
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Pet invitation declined'),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(error.toString().replaceFirst('Bad state: ', '')),
-        ),
-      );
-    }
-  }
-
-  void _openPet(SharedPet pet) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => SharedPetDetailPage(petId: pet.id)),
-    );
-  }
 }
 
-class _SimplePetCard extends StatelessWidget {
-  const _SimplePetCard({
-    required this.pet,
-    required this.myId,
-    required this.onTap,
-  });
+class _PetHouseScene extends StatelessWidget {
+  const _PetHouseScene({required this.primary});
 
-  final SharedPet pet;
-  final String myId;
-  final VoidCallback onTap;
+  final Color primary;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final friendName = pet.friendName(myId);
+    const roof = Color(0xFF8A76A4);
+    const door = Color(0xFF8A6248);
 
-    return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(28),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: colors.primary.withValues(alpha: .10)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x09000000),
-                blurRadius: 18,
-                offset: Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              SizedBox(
-                height: 172,
-                child: Center(
-                  child: PetActor(
-                    // This is exactly the same PetActor used by the floating pet.
-                    // It replaces the old flame-person avatar on Pet Center.
-                    visualSize: 150,
-                    hitSize: 168,
-                    onDragUpdate: (_) {},
-                    onDragEnd: () {},
-                    onTap: onTap,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              bottom: 4,
+              child: Container(
+                width: maxWidth * .58,
+                height: (maxHeight * .055).clamp(14.0, 24.0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6F7A62).withValues(alpha: .14),
+                  borderRadius: BorderRadius.circular(100),
                 ),
               ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          pet.petName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.onSurface,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'with $friendName',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.onSurfaceVariant,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _LevelChip(level: pet.level),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MiniStat(
-                      icon: Icons.favorite_rounded,
-                      label: 'Bond',
-                      value: '${pet.bondPercent()}%',
-                      color: const Color(0xFFFF7199),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MiniStat(
-                      icon: Icons.local_fire_department_rounded,
-                      label: 'Streak',
-                      value: '${pet.streakDays} days',
-                      color: const Color(0xFFFF826B),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 13),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: onTap,
-                  icon: const Icon(Icons.pets_rounded, size: 18),
-                  label: const Text('View pet'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LevelChip extends StatelessWidget {
-  const _LevelChip({required this.level});
-
-  final int level;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors.primary.withValues(alpha: .09),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: Text(
-        'Lv.$level',
-        style: TextStyle(
-          color: colors.primary,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .42),
-        borderRadius: BorderRadius.circular(17),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colors.onSurface,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ),
+            Positioned.fill(
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox(
+                  width: maxWidth * .82,
+                  height: maxHeight * .88,
+                  child: const FittedBox(
+                    fit: BoxFit.contain,
+                    alignment: Alignment.bottomCenter,
+                    child: _PetHouseIllustration(
+                      roofColor: roof,
+                      doorColor: door,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PetHouseIllustration extends StatelessWidget {
+  const _PetHouseIllustration({
+    required this.roofColor,
+    required this.doorColor,
+  });
+
+  final Color roofColor;
+  final Color doorColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 232,
+      height: 188,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
+        children: [
+          // Warm cream body.
+          Positioned(
+            bottom: 0,
+            child: Container(
+              width: 170,
+              height: 116,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3E7D6),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(8),
+                  bottom: Radius.circular(22),
+                ),
+                border: Border.all(color: const Color(0xFFD8C9B7), width: 1.4),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A514A43),
+                    blurRadius: 14,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Low-saturation roof.
+          Positioned(
+            top: 20,
+            child: Transform.rotate(
+              angle: .785398,
+              child: Container(
+                width: 122,
+                height: 122,
+                decoration: BoxDecoration(
+                  color: roofColor,
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: const Color(0xFF756488),
+                    width: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Roof lip softens the geometric diamond look.
+          Positioned(
+            top: 66,
+            child: Container(
+              width: 184,
+              height: 22,
+              decoration: BoxDecoration(
+                color: roofColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+
+          // Paw emblem.
+          Positioned(
+            top: 54,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F0E6),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFD9CCBD), width: 1),
+              ),
+              child: Icon(Icons.pets_rounded, size: 22, color: roofColor),
+            ),
+          ),
+
+          // Wooden door.
+          Positioned(
+            bottom: 0,
+            child: Container(
+              width: 56,
+              height: 76,
+              decoration: BoxDecoration(
+                color: doorColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(26),
+                ),
+              ),
+              child: Align(
+                alignment: const Alignment(.56, .08),
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE5C06A),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 48,
+            bottom: 42,
+            child: _HouseWindow(frameColor: roofColor),
+          ),
+          Positioned(
+            right: 48,
+            bottom: 42,
+            child: _HouseWindow(frameColor: roofColor),
           ),
         ],
       ),
@@ -512,116 +397,27 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-class _IncomingInviteTile extends StatelessWidget {
-  const _IncomingInviteTile({
-    required this.invite,
-    required this.onAccept,
-    required this.onDecline,
-  });
+class _HouseWindow extends StatelessWidget {
+  const _HouseWindow({required this.frameColor});
 
-  final PetInvite invite;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
+  final Color frameColor;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-        decoration: BoxDecoration(
-          color: colors.primary.withValues(alpha: .06),
-          borderRadius: BorderRadius.circular(18),
+    return Container(
+      width: 33,
+      height: 40,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFE7A8),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: Color.lerp(frameColor, const Color(0xFF6F5D7F), .28)!,
+          width: 3,
         ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 19,
-              backgroundColor: colors.surface,
-              child: Icon(Icons.pets_rounded, size: 18, color: colors.primary),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${invite.senderName} invited you',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.onSurface,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Raise “${invite.petName}” together',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontSize: 9,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Decline',
-              onPressed: onDecline,
-              icon: Icon(
-                Icons.close_rounded,
-                color: colors.onSurfaceVariant,
-                size: 18,
-              ),
-            ),
-            FilledButton(onPressed: onAccept, child: const Text('Accept')),
-          ],
-        ),
+        boxShadow: const [BoxShadow(color: Color(0x22E5B84E), blurRadius: 8)],
       ),
-    );
-  }
-}
-
-class _OutgoingInviteTile extends StatelessWidget {
-  const _OutgoingInviteTile({required this.invite});
-
-  final PetInvite invite;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest.withValues(alpha: .42),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.schedule_rounded, size: 17, color: colors.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Waiting for ${invite.receiverName} · ${invite.petName}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        ),
+      child: const Center(
+        child: Icon(Icons.add_rounded, color: Color(0xCFFFFFFF), size: 22),
       ),
     );
   }
@@ -632,40 +428,37 @@ class _EmptyPetCenter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 26, 28, 44),
+      padding: const EdgeInsets.fromLTRB(24, 36, 24, 36),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SizedBox(
-            height: 180,
-            child: Center(
-              child: PetActor(
-                visualSize: 145,
-                hitSize: 165,
-                onDragUpdate: (_) {},
-                onDragEnd: () {},
-                onTap: () {},
-              ),
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: .09),
+              shape: BoxShape.circle,
             ),
+            child: Icon(Icons.cottage_rounded, size: 45, color: scheme.primary),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'No shared pets yet',
+          const SizedBox(height: 18),
+          const Text(
+            'Your pet house is waiting',
             style: TextStyle(
-              color: colors.onSurface,
+              color: Color(0xFF3D3340),
               fontSize: 18,
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 7),
-          Text(
-            'Start a shared pet from a friend chat.',
+          const Text(
+            'Start a shared pet from a friend chat. Once a pet moves in, this page becomes the entrance to your Pet House.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: colors.onSurfaceVariant,
+              color: Color(0xFF938795),
               fontSize: 11,
               height: 1.4,
             ),
@@ -683,31 +476,12 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.pets_rounded, size: 38, color: colors.primary),
-            const SizedBox(height: 12),
-            Text(
-              'Pet Center could not load.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colors.onSurface,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10),
-            ),
-          ],
+        child: Text(
+          'Pet Center could not load.\n\n$message',
+          textAlign: TextAlign.center,
         ),
       ),
     );

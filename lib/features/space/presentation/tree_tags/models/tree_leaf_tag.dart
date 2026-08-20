@@ -65,9 +65,7 @@ class TreeLeafTag {
     };
   }
 
-  factory TreeLeafTag.fromMap(
-    Map<String, dynamic> map,
-  ) {
+  factory TreeLeafTag.fromMap(Map<String, dynamic> map) {
     return TreeLeafTag(
       id: map['id'] as String,
       treeOwnerId: map['treeOwnerId'] as String,
@@ -75,9 +73,7 @@ class TreeLeafTag {
       content: map['content'] as String,
       x: (map['x'] as num).toDouble(),
       y: (map['y'] as num).toDouble(),
-      createdAt: DateTime.parse(
-        map['createdAt'] as String,
-      ),
+      createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }
 }

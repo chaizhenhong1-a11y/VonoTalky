@@ -15,10 +15,7 @@ class TimeCapsuleSceneHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xDDFBF7EE),
         borderRadius: BorderRadius.circular(100),
@@ -33,10 +30,7 @@ class TimeCapsuleSceneHint extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            icon,
-            style: const TextStyle(fontSize: 22),
-          ),
+          Text(icon, style: const TextStyle(fontSize: 22)),
           const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,10 +46,7 @@ class TimeCapsuleSceneHint extends StatelessWidget {
               ),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF918A7D),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF918A7D)),
               ),
             ],
           ),

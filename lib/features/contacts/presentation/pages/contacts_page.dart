@@ -301,60 +301,85 @@ class _ContactTile extends StatelessWidget {
   final VoidCallback onVideoCall;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    minVerticalPadding: 5,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-    leading: CircleAvatar(
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: ListTile(
+      minVerticalPadding: 5,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      leading: _ContactAvatar(user: user),
+      title: Text(
+        user.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+      subtitle: Row(
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: user.isOnline
+                  ? const Color(0xFF24C77A)
+                  : const Color(0xFFE1A43A),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            user.isOnline ? 'Available' : 'Offline',
+            style: const TextStyle(fontSize: 11),
+          ),
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ActionIcon(icon: Icons.chat_bubble_rounded, onTap: onMessage),
+          _ActionIcon(icon: Icons.call_rounded, onTap: onVoiceCall),
+          _ActionIcon(icon: Icons.videocam_rounded, onTap: onVideoCall),
+        ],
+      ),
+      onTap: onOpenDetails,
+    ),
+  );
+}
+
+class _ContactAvatar extends StatelessWidget {
+  const _ContactAvatar({required this.user});
+
+  final ChatUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = user.photoUrl?.trim();
+
+    Widget fallback() => CircleAvatar(
       radius: 23,
       backgroundColor: const Color(0xFFE5DAF5),
-      backgroundImage: user.photoUrl == null
-          ? null
-          : NetworkImage(user.photoUrl!),
-      child: user.photoUrl == null
-          ? Text(
-              user.name[0].toUpperCase(),
-              style: const TextStyle(
-                color: Color(0xFF65439B),
-                fontWeight: FontWeight.w700,
-              ),
-            )
-          : null,
-    ),
-    title: Text(
-      user.name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-    ),
-    subtitle: Row(
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: user.isOnline
-                ? const Color(0xFF24C77A)
-                : const Color(0xFFE1A43A),
-            shape: BoxShape.circle,
-          ),
+      child: Text(
+        user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
+        style: const TextStyle(
+          color: Color(0xFF65439B),
+          fontWeight: FontWeight.w700,
         ),
-        const SizedBox(width: 5),
-        Text(
-          user.isOnline ? 'Available' : 'Offline',
-          style: const TextStyle(fontSize: 11),
-        ),
-      ],
-    ),
-    trailing: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _ActionIcon(icon: Icons.chat_bubble_rounded, onTap: onMessage),
-        _ActionIcon(icon: Icons.call_rounded, onTap: onVoiceCall),
-        _ActionIcon(icon: Icons.videocam_rounded, onTap: onVideoCall),
-      ],
-    ),
-    onTap: onOpenDetails,
-  );
+      ),
+    );
+
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return fallback();
+    }
+
+    return ClipOval(
+      child: Image.network(
+        photoUrl,
+        width: 46,
+        height: 46,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback(),
+      ),
+    );
+  }
 }
 
 class _ActionIcon extends StatelessWidget {

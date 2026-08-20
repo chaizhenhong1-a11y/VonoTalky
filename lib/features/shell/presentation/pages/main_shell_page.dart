@@ -14,6 +14,7 @@ import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../presence/data/services/presence_service.dart';
 import '../../../pet/data/services/pet_notification_service.dart';
 import '../../../space/presentation/pages/space.dart';
+
 class MainShellPage extends StatefulWidget {
   const MainShellPage({super.key});
 

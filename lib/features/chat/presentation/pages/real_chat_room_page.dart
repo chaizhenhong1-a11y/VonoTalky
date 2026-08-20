@@ -120,6 +120,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
   Timer? voiceTimer;
   OverlayEntry? floatingPetOverlayEntry;
   bool floatingPetSuppressed = false;
+  bool chatBackgroundSwitcherCollapsed = false;
   ChatMessagesState get _messagesState =>
       context.read<ChatMessagesBloc>().state;
   ChatComposerState get _composerState =>
@@ -338,7 +339,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
       }
     });
     try {
-      await service.toggleReaction(widget.user.uid, messageId, 'Ã¢ÂÂ¤Ã¯Â¸Â');
+      await service.toggleReaction(widget.user.uid, messageId, '❤️');
     } catch (_) {
       if (mounted) _notice('Reaction could not be updated');
     }
@@ -561,7 +562,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
           voiceCancelArmed
               ? 'Release to cancel'
               : recording
-              ? 'Release to send Ã‚Â· Slide up to cancel'
+              ? 'Release to send · Slide up to cancel'
               : 'Hold to talk',
           style: TextStyle(
             color: voiceCancelArmed
@@ -848,7 +849,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                             ),
                             Text(
                               context.watch<ChatPresenceCubit>().state.typing
-                                  ? 'TypingÃ¢â‚¬Â¦'
+                                  ? 'Typing…'
                                   : widget.user.isOnline
                                   ? 'Online'
                                   : _lastSeen(widget.user.lastSeen),
@@ -1407,7 +1408,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                                         Text(
                                                                           sentAt ==
                                                                                   null
-                                                                              ? 'SendingÃ¢â‚¬Â¦'
+                                                                              ? 'Sending…'
                                                                               : _messageTime(
                                                                                   sentAt,
                                                                                 ),
@@ -1575,7 +1576,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                                           child,
                                                                     ),
                                                                 child: const Text(
-                                                                  'Ã¢ÂÂ¤Ã¯Â¸Â',
+                                                                  '❤️',
                                                                   style: TextStyle(
                                                                     fontSize:
                                                                         42,
@@ -1620,21 +1621,94 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                           Positioned(
                             top: 12,
                             right: 12,
-                            child: _ChatBackgroundSwitcher(
-                              otherName: widget.user.name,
-                              viewMode: _backgroundState.viewMode,
-                              otherAvailable: _backgroundState.otherAvailable,
-                              onToggle: () {
-                                final cubit = context
-                                    .read<ChatBackgroundCubit>();
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: Tween<double>(
+                                        begin: 0.92,
+                                        end: 1,
+                                      ).animate(animation),
+                                      alignment: Alignment.centerRight,
+                                      child: child,
+                                    ),
+                                  ),
+                              child: chatBackgroundSwitcherCollapsed
+                                  ? Material(
+                                      key: const ValueKey(
+                                        'chat-background-switcher-collapsed',
+                                      ),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.94,
+                                      ),
+                                      elevation: 3,
+                                      shadowColor: const Color(0x22000000),
+                                      shape: const CircleBorder(),
+                                      child: IconButton(
+                                        onPressed: () => setState(
+                                          () =>
+                                              chatBackgroundSwitcherCollapsed =
+                                                  false,
+                                        ),
+                                        tooltip: 'Show background switcher',
+                                        icon: const Icon(
+                                          Icons.wallpaper_rounded,
+                                          size: 21,
+                                          color: Color(0xFF5F5369),
+                                        ),
+                                      ),
+                                    )
+                                  : Row(
+                                      key: const ValueKey(
+                                        'chat-background-switcher-expanded',
+                                      ),
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _ChatBackgroundSwitcher(
+                                          otherName: widget.user.name,
+                                          viewMode: _backgroundState.viewMode,
+                                          otherAvailable:
+                                              _backgroundState.otherAvailable,
+                                          onToggle: () {
+                                            final cubit = context
+                                                .read<ChatBackgroundCubit>();
 
-                                if (cubit.state.viewMode ==
-                                    ChatBackgroundViewMode.mine) {
-                                  cubit.showOther();
-                                } else {
-                                  cubit.showMine();
-                                }
-                              },
+                                            if (cubit.state.viewMode ==
+                                                ChatBackgroundViewMode.mine) {
+                                              cubit.showOther();
+                                            } else {
+                                              cubit.showMine();
+                                            }
+                                          },
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Material(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.94,
+                                          ),
+                                          elevation: 3,
+                                          shadowColor: const Color(0x22000000),
+                                          shape: const CircleBorder(),
+                                          child: IconButton(
+                                            onPressed: () => setState(
+                                              () =>
+                                                  chatBackgroundSwitcherCollapsed =
+                                                      true,
+                                            ),
+                                            tooltip: 'Hide background switcher',
+                                            icon: const Icon(
+                                              Icons.chevron_right_rounded,
+                                              size: 22,
+                                              color: Color(0xFF5F5369),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                             ),
                           ),
                       ],
@@ -1730,7 +1804,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                     ),
                                     SizedBox(width: 8),
                                     Text(
-                                      'Finding original messageÃ¢â‚¬Â¦',
+                                      'Finding original message…',
                                       style: TextStyle(
                                         color: Color(0xFF6F5C81),
                                         fontSize: 11,
@@ -2086,69 +2160,72 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
     overlay.insert(floatingPetOverlayEntry!);
   }
 
-  Widget _buildFloatingPetOverlay(BuildContext overlayContext) =>
-      Positioned.fill(
-        child: _petState.sharedPet == null
-            ? const IgnorePointer(child: SizedBox.expand())
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  const petHitSize = 108.0;
-                  const visibleGrip = 20.0;
+  Widget _buildFloatingPetOverlay(
+    BuildContext overlayContext,
+  ) => Positioned.fill(
+    child: _petState.sharedPet == null
+        ? const IgnorePointer(child: SizedBox.expand())
+        : LayoutBuilder(
+            // Keep the overlay builder from shadowing the chat page's
+            // BuildContext. The root Overlay lives above the Bloc providers,
+            // so drag updates must use this State's context to reach ChatPetCubit.
+            builder: (_, constraints) {
+              const petHitSize = 108.0;
+              const visibleGrip = 20.0;
 
-                  final minX = -(petHitSize - visibleGrip);
-                  final minY = -(petHitSize - visibleGrip);
-                  final maxX = constraints.maxWidth - visibleGrip;
-                  final maxY = constraints.maxHeight - visibleGrip;
+              final minX = -(petHitSize - visibleGrip);
+              final minY = -(petHitSize - visibleGrip);
+              final maxX = constraints.maxWidth - visibleGrip;
+              final maxY = constraints.maxHeight - visibleGrip;
 
-                  final left = (minX + floatingPetAnchor.dx * (maxX - minX))
-                      .clamp(minX, maxX)
-                      .toDouble();
-                  final top = (minY + floatingPetAnchor.dy * (maxY - minY))
-                      .clamp(minY, maxY)
-                      .toDouble();
+              final left = (minX + floatingPetAnchor.dx * (maxX - minX))
+                  .clamp(minX, maxX)
+                  .toDouble();
+              final top = (minY + floatingPetAnchor.dy * (maxY - minY))
+                  .clamp(minY, maxY)
+                  .toDouble();
 
-                  if (!floatingPetVisible) {
-                    return const IgnorePointer(child: SizedBox.expand());
-                  }
+              if (!floatingPetVisible) {
+                return const IgnorePointer(child: SizedBox.expand());
+              }
 
-                  if (!floatingPetVisible || floatingPetSuppressed) {
-                    return const IgnorePointer(child: SizedBox.expand());
-                  }
+              if (!floatingPetVisible || floatingPetSuppressed) {
+                return const IgnorePointer(child: SizedBox.expand());
+              }
 
-                  return Stack(
-                    children: [
-                      Positioned(
-                        left: left,
-                        top: top,
-                        child: FloatingPetActor(
-                          visualSize: 92,
-                          hitSize: 108,
-                          onTap: () =>
-                              _showFloatingPetMenu(_petState.sharedPet!),
-                          onDragUpdate: (delta) {
-                            final nextX = (left + delta.dx)
-                                .clamp(minX, maxX)
-                                .toDouble();
-                            final nextY = (top + delta.dy)
-                                .clamp(minY, maxY)
-                                .toDouble();
+              return Stack(
+                children: [
+                  Positioned(
+                    left: left,
+                    top: top,
+                    child: FloatingPetActor(
+                      visualSize: 92,
+                      hitSize: 108,
+                      onTap: () => _showFloatingPetMenu(_petState.sharedPet!),
+                      onDragUpdate: (delta) {
+                        final nextX = (left + delta.dx)
+                            .clamp(minX, maxX)
+                            .toDouble();
+                        final nextY = (top + delta.dy)
+                            .clamp(minY, maxY)
+                            .toDouble();
 
-                            context.read<ChatPetCubit>().updateAnchor(
-                              Offset(
-                                (nextX - minX) / (maxX - minX),
-                                (nextY - minY) / (maxY - minY),
-                              ),
-                            );
-                            floatingPetOverlayEntry?.markNeedsBuild();
-                          },
-                          onDragEnd: _saveFloatingPetState,
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-      );
+                        context.read<ChatPetCubit>().updateAnchor(
+                          Offset(
+                            (nextX - minX) / (maxX - minX),
+                            (nextY - minY) / (maxY - minY),
+                          ),
+                        );
+                        floatingPetOverlayEntry?.markNeedsBuild();
+                      },
+                      onDragEnd: _saveFloatingPetState,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+  );
 
   Future<void> _showFloatingPetMenu(SharedPet pet) async {
     final action = await showModalBottomSheet<String>(
@@ -2936,32 +3013,26 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children:
-                      const [
-                            'Ã°Å¸â€˜Â',
-                            'Ã¢ÂÂ¤Ã¯Â¸Â',
-                            'Ã°Å¸Ëœâ€š',
-                            'Ã°Å¸ËœÂ®',
-                            'Ã°Å¸ËœÂ¢',
-                            'Ã°Å¸â„¢Â',
-                          ]
-                          .map(
-                            (emoji) => InkWell(
-                              borderRadius: BorderRadius.circular(22),
-                              onTap: () =>
-                                  Navigator.pop(sheetContext, 'react:$emoji'),
-                              child: Padding(
-                                padding: EdgeInsets.all(8),
-                                child: Text(
-                                  emoji,
-                                  style: TextStyle(fontSize: 24),
-                                ),
-                              ),
+                Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: const ['👍', '❤️', '😂', '😮', '😢', '🙏']
+                      .map(
+                        (emoji) => InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: () =>
+                              Navigator.pop(sheetContext, 'react:$emoji'),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Text(
+                              emoji,
+                              style: const TextStyle(fontSize: 24),
                             ),
-                          )
-                          .toList(),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
                 const Divider(height: 18),
                 Row(
@@ -3745,7 +3816,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
   }
 
   String _dateLabel(DateTime? value) {
-    if (value == null) return 'SendingÃ¢â‚¬Â¦';
+    if (value == null) return 'Sending…';
     final date = value.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
