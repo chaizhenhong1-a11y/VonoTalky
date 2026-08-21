@@ -95,9 +95,16 @@ class UnifiedRecentChats extends StatelessWidget {
                             Icons.archive_outlined,
                             color: Theme.of(context).colorScheme.primary,
                           ),
-                          title: const Text(
+                          title: Text(
                             'Archived Chats',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black,
+                            ),
                           ),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => Navigator.push(
@@ -828,9 +835,7 @@ class _GroupAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => CircleAvatar(
     radius: 25,
-    backgroundColor: Theme.of(
-      context,
-    ).colorScheme.primary.withValues(alpha: .12),
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     backgroundImage: group.photoUrl == null
         ? null
         : NetworkImage(group.photoUrl!),
@@ -838,7 +843,7 @@ class _GroupAvatar extends StatelessWidget {
         ? Text(
             group.name.isEmpty ? '?' : group.name[0].toUpperCase(),
             style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w800,
             ),
           )
@@ -896,7 +901,12 @@ class _ThreadTile extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
             ),
           ),
           if (pinned) ...[
@@ -916,14 +926,18 @@ class _ThreadTile extends StatelessWidget {
                   TextSpan(
                     text: 'Draft: ',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white70
+                          : Colors.black54,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   TextSpan(
                     text: subtitle.replaceAll('\n', ' '),
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white70
+                          : Colors.black54,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -932,14 +946,28 @@ class _ThreadTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             )
-          : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          : Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.black54,
+              ),
+            ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
             time,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF756E7C)),
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white70
+                  : Colors.black54,
+            ),
           ),
           if (unread > 0)
             Container(
@@ -977,13 +1005,19 @@ class _UserAvatar extends StatelessWidget {
     children: [
       CircleAvatar(
         radius: 25,
-        backgroundColor: Theme.of(
-          context,
-        ).colorScheme.primary.withValues(alpha: .12),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         backgroundImage: user.photoUrl == null
             ? null
             : NetworkImage(user.photoUrl!),
-        child: user.photoUrl == null ? Text(user.name[0].toUpperCase()) : null,
+        child: user.photoUrl == null
+            ? Text(
+                user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            : null,
       ),
       if (user.isOnline)
         Positioned(
@@ -995,7 +1029,10 @@ class _UserAvatar extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFF24C77A),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
+              border: Border.all(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                width: 2,
+              ),
             ),
           ),
         ),
@@ -1088,7 +1125,15 @@ class _EmptyState extends StatelessWidget {
       children: [
         Icon(icon, size: 52, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 12),
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
+        Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
+          ),
+        ),
       ],
     ),
   );

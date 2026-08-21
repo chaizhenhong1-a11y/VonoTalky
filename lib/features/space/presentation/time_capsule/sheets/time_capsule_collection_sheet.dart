@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/time_capsule_item.dart';
 import '../utils/time_capsule_date.dart';
 
-enum TimeCapsuleCollectionActionType { create, select }
+enum TimeCapsuleCollectionActionType { create, select, delete }
 
 class TimeCapsuleCollectionResult {
   const TimeCapsuleCollectionResult._({required this.type, this.capsule});
@@ -13,6 +13,9 @@ class TimeCapsuleCollectionResult {
 
   const TimeCapsuleCollectionResult.select(TimeCapsuleItem capsule)
     : this._(type: TimeCapsuleCollectionActionType.select, capsule: capsule);
+
+  const TimeCapsuleCollectionResult.delete(TimeCapsuleItem capsule)
+    : this._(type: TimeCapsuleCollectionActionType.delete, capsule: capsule);
 
   final TimeCapsuleCollectionActionType type;
   final TimeCapsuleItem? capsule;
@@ -135,6 +138,11 @@ Future<TimeCapsuleCollectionResult?> showTimeCapsuleCollectionSheet({
                             Navigator.of(
                               sheetContext,
                             ).pop(TimeCapsuleCollectionResult.select(capsule));
+                          },
+                          onLongPress: () {
+                            Navigator.of(
+                              sheetContext,
+                            ).pop(TimeCapsuleCollectionResult.delete(capsule));
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(16),

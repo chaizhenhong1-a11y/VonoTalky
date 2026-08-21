@@ -21,19 +21,19 @@ class _PetHomePageState extends State<PetHomePage> {
       body: StreamBuilder<List<SharedPet>>(
         stream: service.watchMyPets(),
         builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return _ErrorState(message: snapshot.error.toString());
-            }
+          if (snapshot.hasError) {
+            return _ErrorState(message: snapshot.error.toString());
+          }
 
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            final pets = snapshot.data!;
+          final pets = snapshot.data!;
 
-            if (pets.isEmpty) {
-              return const _EmptyPetCenter();
-            }
+          if (pets.isEmpty) {
+            return const _EmptyPetCenter();
+          }
 
           return _FixedPetHouseScene(onEnter: () => _enterHouse(pets));
         },

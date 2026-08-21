@@ -12,6 +12,45 @@ service cloud.firestore {
         allow read, create, update, delete: if request.auth != null
                                             && request.auth.uid == userId;
       }
+      match /treeTags/{tagId} {
+         allow read: if request.auth != null;
+
+         allow create: if request.auth != null
+                       && request.resource.data.treeOwnerId == userId
+                       && request.resource.data.authorId == request.auth.uid;
+
+         allow delete: if request.auth != null
+                       && (
+                         request.auth.uid == userId
+                         || resource.data.authorId == request.auth.uid
+                       );
+
+         allow update: if false;
+      }
+
+
+      match /timeCapsules/{capsuleId} {
+        allow read: if request.auth != null
+                    && request.auth.uid == userId;
+
+        allow create: if request.auth != null
+                      && request.auth.uid == userId
+                      && request.resource.data.keys().hasOnly([
+                        'title',
+                        'content',
+                        'createdAt',
+                        'unlockDate'
+                      ])
+                      && request.resource.data.title is string
+                      && request.resource.data.content is string
+                      && request.resource.data.createdAt is timestamp
+                      && request.resource.data.unlockDate is timestamp;
+
+        allow update: if false;
+
+        allow delete: if request.auth != null
+                      && request.auth.uid == userId;
+      }
 
       match /contacts/{contactId} {
         allow read: if request.auth != null && request.auth.uid == userId;
@@ -47,8 +86,11 @@ service cloud.firestore {
     }
 
     match /friendRequests/{requestId} {
-      allow read: if request.auth != null
-                  && request.auth.uid in resource.data.memberIds;
+      allow get: if request.auth != null
+                 && request.auth.uid in resource.data.memberIds;
+
+      allow list: if request.auth != null
+                   && request.auth.uid in resource.data.memberIds;
       allow create: if request.auth != null
                     && request.resource.data.senderId == request.auth.uid
                     && request.resource.data.receiverId != request.auth.uid
@@ -210,95 +252,83 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
                     && request.auth.uid in resource.data.memberIds;
-
-      match /memories/{memoryId} {
-        allow read: if request.auth != null
-                    && request.auth.uid in
-                       get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds;
-
-        allow create: if request.auth != null
-                      && request.auth.uid in
-                         get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds
-                      && request.resource.data.actorId == request.auth.uid;
-
-        allow update, delete: if false;
-      }
-
-      match /careRequests/{requestId} {
-        allow read: if request.auth != null
-                    && request.auth.uid in
-                       get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds;
-
-        allow create: if request.auth != null
-                      && request.resource.data.senderId == request.auth.uid
-                      && request.resource.data.receiverId != request.auth.uid
-                      && request.resource.data.status == 'pending'
-                      && request.resource.data.type in ['feed', 'play', 'pet']
-                      && request.resource.data.senderId in
-                         get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds
-                      && request.resource.data.receiverId in
-                         get(/databases/$(database)/documents/sharedPets/$(petId)).data.memberIds
-                      && request.resource.data.keys().hasOnly([
-                        'type',
-                        'senderId',
-                        'receiverId',
-                        'status',
-                        'createdAt',
-                        'respondedAt'
-                      ]);
-
-        allow update: if request.auth != null
-                      && request.auth.uid == resource.data.receiverId
-                      && resource.data.status == 'pending'
-                      && request.resource.data.status in ['completed', 'dismissed']
-                      && request.resource.data.senderId == resource.data.senderId
-                      && request.resource.data.receiverId == resource.data.receiverId
-                      && request.resource.data.type == resource.data.type
-                      && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['status', 'respondedAt']);
-
-        allow delete: if false;
-      }
     }
 
 
-    // Phase 74: shared-pet invitations
-    match /petInvites/{inviteId} {
+
+    // Phase 106: one-to-one call signaling.
+    match /calls/{callId} {
+      function callParticipant() {
+        return request.auth != null
+               && (
+                 request.auth.uid == resource.data.callerId
+                 || request.auth.uid == resource.data.calleeId
+               );
+      }
+
+      function incomingCallParticipant() {
+        return request.auth != null
+               && (
+                 request.auth.uid == request.resource.data.callerId
+                 || request.auth.uid == request.resource.data.calleeId
+               );
+      }
+
       allow read: if request.auth != null
                   && request.auth.uid in resource.data.memberIds;
 
       allow create: if request.auth != null
-                    && request.resource.data.senderId == request.auth.uid
-                    && request.resource.data.receiverId != request.auth.uid
-                    && request.resource.data.status == 'pending'
+                    && request.resource.data.callerId == request.auth.uid
+                    && request.resource.data.calleeId != request.auth.uid
+                    && request.resource.data.type == 'audio'
+                    && request.resource.data.status == 'ringing'
                     && request.resource.data.memberIds is list
                     && request.resource.data.memberIds.size() == 2
-                    && request.resource.data.senderId in request.resource.data.memberIds
-                    && request.resource.data.receiverId in request.resource.data.memberIds
-                    && request.resource.data.keys().hasOnly([
-                      'memberIds',
-                      'senderId',
-                      'senderName',
-                      'receiverId',
-                      'receiverName',
-                      'petName',
-                      'status',
-                      'createdAt',
-                      'respondedAt',
-                      'petId'
-                    ]);
+                    && request.resource.data.callerId in request.resource.data.memberIds
+                    && request.resource.data.calleeId in request.resource.data.memberIds;
 
-      allow update: if request.auth != null
-                    && request.auth.uid == resource.data.receiverId
-                    && resource.data.status == 'pending'
-                    && request.resource.data.status in ['accepted', 'rejected']
+      allow update: if callParticipant()
+                    && incomingCallParticipant()
+                    && request.resource.data.callerId == resource.data.callerId
+                    && request.resource.data.calleeId == resource.data.calleeId
                     && request.resource.data.memberIds == resource.data.memberIds
-                    && request.resource.data.senderId == resource.data.senderId
-                    && request.resource.data.receiverId == resource.data.receiverId
-                    && request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['status', 'respondedAt', 'petId']);
+                    && request.resource.data.type == resource.data.type;
 
       allow delete: if false;
+
+      match /callerCandidates/{candidateId} {
+        function parentCall() {
+          return get(/databases/$(database)/documents/calls/$(callId)).data;
+        }
+
+        allow read: if request.auth != null
+                    && (
+                      request.auth.uid == parentCall().callerId
+                      || request.auth.uid == parentCall().calleeId
+                    );
+
+        allow create: if request.auth != null
+                      && request.auth.uid == parentCall().callerId;
+
+        allow update, delete: if false;
+      }
+
+      match /calleeCandidates/{candidateId} {
+        function parentCall() {
+          return get(/databases/$(database)/documents/calls/$(callId)).data;
+        }
+
+        allow read: if request.auth != null
+                    && (
+                      request.auth.uid == parentCall().callerId
+                      || request.auth.uid == parentCall().calleeId
+                    );
+
+        allow create: if request.auth != null
+                      && request.auth.uid == parentCall().calleeId;
+
+        allow update, delete: if false;
+      }
     }
 
     match /{document=**} {

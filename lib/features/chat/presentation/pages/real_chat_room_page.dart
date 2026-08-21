@@ -29,6 +29,7 @@ import '../widgets/file_message_bubble.dart';
 import '../widgets/message_reply_widgets.dart';
 import '../widgets/recording_composer.dart';
 import '../widgets/chat_emoji_picker.dart';
+import '../../../calls/presentation/pages/audio_call_page.dart';
 import '../../../contacts/presentation/pages/contact_detail_page.dart';
 import '../../../contacts/data/services/contact_detail_service.dart';
 import '../../../pet/data/models/pet_invite.dart';
@@ -111,6 +112,8 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
   final petChatProgressService = SharedPetChatProgressService();
   final sharedPetService = SharedPetService();
   final notificationService = PetNotificationService();
+  late ChatPetCubit _chatPetCubit;
+  Offset? _floatingPetDragAnchor;
 
   late final String activeConversationId;
   Timer? typingTimer;
@@ -120,7 +123,6 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
   Timer? voiceTimer;
   OverlayEntry? floatingPetOverlayEntry;
   bool floatingPetSuppressed = false;
-  bool chatBackgroundSwitcherCollapsed = false;
   ChatMessagesState get _messagesState =>
       context.read<ChatMessagesBloc>().state;
   ChatComposerState get _composerState =>
@@ -131,7 +133,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
       context.read<ChatAttachmentCubit>().state;
   ChatBackgroundState get _backgroundState =>
       context.read<ChatBackgroundCubit>().state;
-  ChatPetState get _petState => context.read<ChatPetCubit>().state;
+  ChatPetState get _petState => _chatPetCubit.state;
 
   List<QueryDocumentSnapshot<Map<String, dynamic>>> get latestMessages =>
       _messagesState.messages;
@@ -165,6 +167,12 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
 
   Offset get floatingPetAnchor => _petState.anchor;
   bool get floatingPetVisible => _petState.visible;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatPetCubit = context.read<ChatPetCubit>();
+  }
 
   @override
   void initState() {
@@ -339,7 +347,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
       }
     });
     try {
-      await service.toggleReaction(widget.user.uid, messageId, '❤️');
+      await service.toggleReaction(widget.user.uid, messageId, 'Ã¢ÂÂ¤Ã¯Â¸Â');
     } catch (_) {
       if (mounted) _notice('Reaction could not be updated');
     }
@@ -547,27 +555,27 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: voiceCancelArmed
-              ? const Color(0xFFF7D9DE)
+              ? Theme.of(context).colorScheme.errorContainer
               : recording
-              ? const Color(0xFFE5D8F5)
-              : const Color(0xFFF7F4FA),
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: voiceCancelArmed
-                ? const Color(0xFFC85B70)
-                : const Color(0xFFD8CBE8),
+                ? Theme.of(context).colorScheme.error
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
         child: Text(
           voiceCancelArmed
               ? 'Release to cancel'
               : recording
-              ? 'Release to send · Slide up to cancel'
+              ? 'Release to send Ã‚Â· Slide up to cancel'
               : 'Hold to talk',
           style: TextStyle(
             color: voiceCancelArmed
-                ? const Color(0xFFB33F58)
-                : const Color(0xFF4E3B63),
+                ? Theme.of(context).colorScheme.onErrorContainer
+                : Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w700,
             fontSize: recording ? 12 : 14,
           ),
@@ -709,13 +717,20 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
     context.watch<ChatPresenceCubit>();
     context.watch<ChatPreferencesCubit>();
 
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return BlocListener<ChatPetCubit, ChatPetState>(
       listener: (_, _) => floatingPetOverlayEntry?.markNeedsBuild(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
           toolbarHeight: 82,
-          backgroundColor: const Color(0xFFE9E3FA),
+          backgroundColor: Color.alphaBlend(
+            colors.primary.withValues(alpha: isDark ? .16 : .12),
+            colors.surface,
+          ),
           surfaceTintColor: Colors.transparent,
           leading: IconButton(
             onPressed: _handleBackPressed,
@@ -771,6 +786,11 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                 ]
               : [
                   IconButton(
+                    onPressed: _startVoiceCall,
+                    tooltip: 'Voice call',
+                    icon: const Icon(Icons.call_outlined),
+                  ),
+                  IconButton(
                     onPressed: _openSearch,
                     tooltip: 'Search messages',
                     icon: const Icon(Icons.search_rounded),
@@ -805,7 +825,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                         children: [
                           CircleAvatar(
                             radius: 23,
-                            backgroundColor: Colors.white,
+                            backgroundColor: colors.surfaceContainerHighest,
                             backgroundImage: widget.user.photoUrl == null
                                 ? null
                                 : NetworkImage(widget.user.photoUrl!),
@@ -824,7 +844,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                   color: const Color(0xFF24C77A),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: Colors.white,
+                                    color: colors.surface,
                                     width: 2,
                                   ),
                                 ),
@@ -849,7 +869,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                             ),
                             Text(
                               context.watch<ChatPresenceCubit>().state.typing
-                                  ? 'Typing…'
+                                  ? 'TypingÃ¢â‚¬Â¦'
                                   : widget.user.isOnline
                                   ? 'Online'
                                   : _lastSeen(widget.user.lastSeen),
@@ -908,6 +928,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                         Positioned.fill(
                           child: Builder(
                             builder: (context) {
+                              if (!mounted) return const SizedBox.shrink();
                               final messagesState = context
                                   .watch<ChatMessagesBloc>()
                                   .state;
@@ -960,10 +981,11 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                       strokeWidth: 2,
                                                     ),
                                               )
-                                            : const Text(
+                                            : Text(
                                                 'Beginning of conversation',
                                                 style: TextStyle(
-                                                  color: Color(0xFF9A919E),
+                                                  color:
+                                                      colors.onSurfaceVariant,
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w600,
                                                 ),
@@ -1029,7 +1051,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                             return false;
                                           },
                                           background: const SizedBox.shrink(),
-                                          secondaryBackground: const Align(
+                                          secondaryBackground: Align(
                                             alignment: Alignment.centerRight,
                                             child: Padding(
                                               padding: EdgeInsets.only(
@@ -1038,12 +1060,12 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                               ),
                                               child: CircleAvatar(
                                                 radius: 19,
-                                                backgroundColor: Color(
-                                                  0xFFE0D3F3,
-                                                ),
+                                                backgroundColor:
+                                                    colors.primaryContainer,
                                                 child: Icon(
                                                   Icons.reply_rounded,
-                                                  color: Color(0xFF7653A5),
+                                                  color:
+                                                      colors.onPrimaryContainer,
                                                 ),
                                               ),
                                             ),
@@ -1159,12 +1181,10 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                               ),
                                                           decoration: BoxDecoration(
                                                             color: mine
-                                                                ? const Color(
-                                                                    0xFFCDBCEB,
-                                                                  )
-                                                                : const Color(
-                                                                    0xFFFFFCF3,
-                                                                  ),
+                                                                ? colors
+                                                                      .primaryContainer
+                                                                : colors
+                                                                      .surfaceContainerHighest,
                                                             borderRadius: BorderRadius.only(
                                                               topLeft:
                                                                   const Radius.circular(
@@ -1345,9 +1365,10 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                                                     as String? ??
                                                                                 '',
                                                                       style: TextStyle(
-                                                                        color: const Color(
-                                                                          0xFF24202A,
-                                                                        ),
+                                                                        color:
+                                                                            isDark
+                                                                            ? Colors.white
+                                                                            : Colors.black,
                                                                         fontStyle:
                                                                             deleted
                                                                             ? FontStyle.italic
@@ -1408,16 +1429,17 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                                         Text(
                                                                           sentAt ==
                                                                                   null
-                                                                              ? 'Sending…'
+                                                                              ? 'SendingÃ¢â‚¬Â¦'
                                                                               : _messageTime(
                                                                                   sentAt,
                                                                                 ),
-                                                                          style: const TextStyle(
+                                                                          style: TextStyle(
                                                                             fontSize:
                                                                                 10,
-                                                                            color: Color(
-                                                                              0xFF716A78,
-                                                                            ),
+                                                                            color:
+                                                                                isDark
+                                                                                ? Colors.white70
+                                                                                : Colors.black54,
                                                                           ),
                                                                         ),
                                                                         if (data['editedAt'] !=
@@ -1576,7 +1598,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                                           child,
                                                                     ),
                                                                 child: const Text(
-                                                                  '❤️',
+                                                                  'Ã¢ÂÂ¤Ã¯Â¸Â',
                                                                   style: TextStyle(
                                                                     fontSize:
                                                                         42,
@@ -1621,94 +1643,21 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                           Positioned(
                             top: 12,
                             right: 12,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: ScaleTransition(
-                                      scale: Tween<double>(
-                                        begin: 0.92,
-                                        end: 1,
-                                      ).animate(animation),
-                                      alignment: Alignment.centerRight,
-                                      child: child,
-                                    ),
-                                  ),
-                              child: chatBackgroundSwitcherCollapsed
-                                  ? Material(
-                                      key: const ValueKey(
-                                        'chat-background-switcher-collapsed',
-                                      ),
-                                      color: Colors.white.withValues(
-                                        alpha: 0.94,
-                                      ),
-                                      elevation: 3,
-                                      shadowColor: const Color(0x22000000),
-                                      shape: const CircleBorder(),
-                                      child: IconButton(
-                                        onPressed: () => setState(
-                                          () =>
-                                              chatBackgroundSwitcherCollapsed =
-                                                  false,
-                                        ),
-                                        tooltip: 'Show background switcher',
-                                        icon: const Icon(
-                                          Icons.wallpaper_rounded,
-                                          size: 21,
-                                          color: Color(0xFF5F5369),
-                                        ),
-                                      ),
-                                    )
-                                  : Row(
-                                      key: const ValueKey(
-                                        'chat-background-switcher-expanded',
-                                      ),
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        _ChatBackgroundSwitcher(
-                                          otherName: widget.user.name,
-                                          viewMode: _backgroundState.viewMode,
-                                          otherAvailable:
-                                              _backgroundState.otherAvailable,
-                                          onToggle: () {
-                                            final cubit = context
-                                                .read<ChatBackgroundCubit>();
+                            child: _ChatBackgroundSwitcher(
+                              otherName: widget.user.name,
+                              viewMode: _backgroundState.viewMode,
+                              otherAvailable: _backgroundState.otherAvailable,
+                              onToggle: () {
+                                final cubit = context
+                                    .read<ChatBackgroundCubit>();
 
-                                            if (cubit.state.viewMode ==
-                                                ChatBackgroundViewMode.mine) {
-                                              cubit.showOther();
-                                            } else {
-                                              cubit.showMine();
-                                            }
-                                          },
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Material(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.94,
-                                          ),
-                                          elevation: 3,
-                                          shadowColor: const Color(0x22000000),
-                                          shape: const CircleBorder(),
-                                          child: IconButton(
-                                            onPressed: () => setState(
-                                              () =>
-                                                  chatBackgroundSwitcherCollapsed =
-                                                      true,
-                                            ),
-                                            tooltip: 'Hide background switcher',
-                                            icon: const Icon(
-                                              Icons.chevron_right_rounded,
-                                              size: 22,
-                                              color: Color(0xFF5F5369),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                if (cubit.state.viewMode ==
+                                    ChatBackgroundViewMode.mine) {
+                                  cubit.showOther();
+                                } else {
+                                  cubit.showMine();
+                                }
+                              },
                             ),
                           ),
                       ],
@@ -1804,7 +1753,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                     ),
                                     SizedBox(width: 8),
                                     Text(
-                                      'Finding original message…',
+                                      'Finding original messageÃ¢â‚¬Â¦',
                                       style: TextStyle(
                                         color: Color(0xFF6F5C81),
                                         fontSize: 11,
@@ -1858,9 +1807,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                               ? 'Switch to keyboard'
                                               : 'Switch to voice',
                                           style: IconButton.styleFrom(
-                                            foregroundColor: const Color(
-                                              0xFF5F3F86,
-                                            ),
+                                            foregroundColor: colors.primary,
                                           ),
                                           icon: Icon(
                                             voiceInputMode
@@ -1982,9 +1929,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                               ? 'Close emoji picker'
                                               : 'Open emoji picker',
                                           style: IconButton.styleFrom(
-                                            foregroundColor: const Color(
-                                              0xFF5F3F86,
-                                            ),
+                                            foregroundColor: colors.primary,
                                           ),
                                           icon: Icon(
                                             showEmojiPicker
@@ -2001,9 +1946,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                               : _showImageSource,
                                           tooltip: 'More',
                                           style: IconButton.styleFrom(
-                                            foregroundColor: const Color(
-                                              0xFF5F3F86,
-                                            ),
+                                            foregroundColor: colors.primary,
                                           ),
                                           icon: uploading
                                               ? const SizedBox(
@@ -2076,7 +2019,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutBack,
                 child: Material(
-                  color: Colors.white,
+                  color: colors.surfaceContainerHighest,
                   elevation: 4,
                   shadowColor: const Color(0x33000000),
                   borderRadius: BorderRadius.circular(22),
@@ -2091,9 +2034,9 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFF7653A5),
+                            color: colors.primary,
                           ),
                           if (newerMessagesBelow > 0) ...[
                             const SizedBox(width: 2),
@@ -2109,8 +2052,8 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                     ? '99+'
                                     : '$newerMessagesBelow',
                                 key: ValueKey(newerMessagesBelow),
-                                style: const TextStyle(
-                                  color: Color(0xFF7653A5),
+                                style: TextStyle(
+                                  color: colors.primary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -2160,72 +2103,84 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
     overlay.insert(floatingPetOverlayEntry!);
   }
 
-  Widget _buildFloatingPetOverlay(
-    BuildContext overlayContext,
-  ) => Positioned.fill(
-    child: _petState.sharedPet == null
-        ? const IgnorePointer(child: SizedBox.expand())
-        : LayoutBuilder(
-            // Keep the overlay builder from shadowing the chat page's
-            // BuildContext. The root Overlay lives above the Bloc providers,
-            // so drag updates must use this State's context to reach ChatPetCubit.
-            builder: (_, constraints) {
-              const petHitSize = 108.0;
-              const visibleGrip = 20.0;
+  Widget _buildFloatingPetOverlay(BuildContext overlayContext) {
+    return StreamBuilder<ChatPetState>(
+      stream: _chatPetCubit.stream,
+      initialData: _chatPetCubit.state,
+      builder: (context, snapshot) {
+        final petState = snapshot.data ?? _chatPetCubit.state;
 
-              final minX = -(petHitSize - visibleGrip);
-              final minY = -(petHitSize - visibleGrip);
-              final maxX = constraints.maxWidth - visibleGrip;
-              final maxY = constraints.maxHeight - visibleGrip;
+        return Positioned.fill(
+          child: petState.sharedPet == null
+              ? const IgnorePointer(child: SizedBox.expand())
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    const petHitSize = 108.0;
+                    const visibleGrip = 20.0;
 
-              final left = (minX + floatingPetAnchor.dx * (maxX - minX))
-                  .clamp(minX, maxX)
-                  .toDouble();
-              final top = (minY + floatingPetAnchor.dy * (maxY - minY))
-                  .clamp(minY, maxY)
-                  .toDouble();
+                    final minX = -(petHitSize - visibleGrip);
+                    final minY = -(petHitSize - visibleGrip);
+                    final maxX = constraints.maxWidth - visibleGrip;
+                    final maxY = constraints.maxHeight - visibleGrip;
 
-              if (!floatingPetVisible) {
-                return const IgnorePointer(child: SizedBox.expand());
-              }
+                    final activeAnchor =
+                        _floatingPetDragAnchor ?? petState.anchor;
 
-              if (!floatingPetVisible || floatingPetSuppressed) {
-                return const IgnorePointer(child: SizedBox.expand());
-              }
+                    final left = (minX + activeAnchor.dx * (maxX - minX))
+                        .clamp(minX, maxX)
+                        .toDouble();
+                    final top = (minY + activeAnchor.dy * (maxY - minY))
+                        .clamp(minY, maxY)
+                        .toDouble();
 
-              return Stack(
-                children: [
-                  Positioned(
-                    left: left,
-                    top: top,
-                    child: FloatingPetActor(
-                      visualSize: 92,
-                      hitSize: 108,
-                      onTap: () => _showFloatingPetMenu(_petState.sharedPet!),
-                      onDragUpdate: (delta) {
-                        final nextX = (left + delta.dx)
-                            .clamp(minX, maxX)
-                            .toDouble();
-                        final nextY = (top + delta.dy)
-                            .clamp(minY, maxY)
-                            .toDouble();
+                    if (!petState.visible || floatingPetSuppressed) {
+                      return const IgnorePointer(child: SizedBox.expand());
+                    }
 
-                        context.read<ChatPetCubit>().updateAnchor(
-                          Offset(
-                            (nextX - minX) / (maxX - minX),
-                            (nextY - minY) / (maxY - minY),
+                    return Stack(
+                      children: [
+                        Positioned(
+                          left: left,
+                          top: top,
+                          child: FloatingPetActor(
+                            visualSize: 92,
+                            hitSize: 108,
+                            onTap: () =>
+                                _showFloatingPetMenu(petState.sharedPet!),
+                            onDragUpdate: (delta) {
+                              final nextX = (left + delta.dx)
+                                  .clamp(minX, maxX)
+                                  .toDouble();
+                              final nextY = (top + delta.dy)
+                                  .clamp(minY, maxY)
+                                  .toDouble();
+
+                              final nextAnchor = Offset(
+                                (nextX - minX) / (maxX - minX),
+                                (nextY - minY) / (maxY - minY),
+                              );
+
+                              _floatingPetDragAnchor = nextAnchor;
+                              floatingPetOverlayEntry?.markNeedsBuild();
+                            },
+                            onDragEnd: () async {
+                              final finalAnchor =
+                                  _floatingPetDragAnchor ?? petState.anchor;
+                              _floatingPetDragAnchor = null;
+
+                              _chatPetCubit.updateAnchor(finalAnchor);
+                              await _saveFloatingPetState();
+                            },
                           ),
-                        );
-                        floatingPetOverlayEntry?.markNeedsBuild();
-                      },
-                      onDragEnd: _saveFloatingPetState,
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-  );
+                        ),
+                      ],
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
 
   Future<void> _showFloatingPetMenu(SharedPet pet) async {
     final action = await showModalBottomSheet<String>(
@@ -2342,6 +2297,13 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
           onMessage: () => Navigator.pop(context),
         ),
       ),
+    );
+  }
+
+  Future<void> _startVoiceCall() async {
+    messageFocusNode.unfocus();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => AudioCallPage(user: widget.user)),
     );
   }
 
@@ -2757,12 +2719,24 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
     );
   }
 
-  Color get _chatBackgroundColor => switch (chatBackground) {
-    'lavender' => const Color(0xFFF0EAF8),
-    'pink' => const Color(0xFFF9EAF0),
-    'cream' => const Color(0xFFFFF7E8),
-    _ => const Color(0xFFEDF2F8),
-  };
+  Color get _chatBackgroundColor {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) {
+      return switch (chatBackground) {
+        'lavender' => const Color(0xFF17131F),
+        'pink' => const Color(0xFF1E1419),
+        'cream' => const Color(0xFF1D1912),
+        _ => const Color(0xFF111820),
+      };
+    }
+
+    return switch (chatBackground) {
+      'lavender' => const Color(0xFFF0EAF8),
+      'pink' => const Color(0xFFF9EAF0),
+      'cream' => const Color(0xFFFFF7E8),
+      _ => const Color(0xFFEDF2F8),
+    };
+  }
 
   void _showBackgroundPicker() {
     const choices = <(String, String, Color)>[
@@ -3013,26 +2987,32 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Wrap(
-                  alignment: WrapAlignment.spaceEvenly,
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: const ['👍', '❤️', '😂', '😮', '😢', '🙏']
-                      .map(
-                        (emoji) => InkWell(
-                          borderRadius: BorderRadius.circular(22),
-                          onTap: () =>
-                              Navigator.pop(sheetContext, 'react:$emoji'),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Text(
-                              emoji,
-                              style: const TextStyle(fontSize: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children:
+                      const [
+                            'Ã°Å¸â€˜Â',
+                            'Ã¢ÂÂ¤Ã¯Â¸Â',
+                            'Ã°Å¸Ëœâ€š',
+                            'Ã°Å¸ËœÂ®',
+                            'Ã°Å¸ËœÂ¢',
+                            'Ã°Å¸â„¢Â',
+                          ]
+                          .map(
+                            (emoji) => InkWell(
+                              borderRadius: BorderRadius.circular(22),
+                              onTap: () =>
+                                  Navigator.pop(sheetContext, 'react:$emoji'),
+                              child: Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Text(
+                                  emoji,
+                                  style: TextStyle(fontSize: 24),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                          )
+                          .toList(),
                 ),
                 const Divider(height: 18),
                 Row(
@@ -3816,7 +3796,7 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
   }
 
   String _dateLabel(DateTime? value) {
-    if (value == null) return 'Sending…';
+    if (value == null) return 'SendingÃ¢â‚¬Â¦';
     final date = value.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

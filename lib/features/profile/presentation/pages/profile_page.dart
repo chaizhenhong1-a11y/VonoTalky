@@ -45,9 +45,14 @@ class ProfilePage extends StatelessWidget {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            title: const Text(
+            title: Text(
               'Profile',
-              style: TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
             ),
             centerTitle: false,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -78,78 +83,18 @@ class ProfilePage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _ProfileHeader(
+                          _ProfileHero(
                             name: name,
                             username: username,
                             bio: bio,
                             photoUrl: photoUrl,
-                          ),
-                          const SizedBox(height: 18),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          EditProfilePage(data: data),
-                                    ),
-                                  ),
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(42),
-                                    backgroundColor: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: .10),
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Edit Profile',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
+                            onEdit: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditProfilePage(data: data),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () =>
-                                      _showQrCode(context, service.uid, name),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(42),
-                                    side: BorderSide(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outlineVariant,
-                                    ),
-                                    foregroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.qr_code_2_rounded,
-                                    size: 18,
-                                  ),
-                                  label: const Text(
-                                    'QR Code',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
+                            onQr: () => _showQrCode(context, service.uid, name),
                           ),
                           const SizedBox(height: 28),
                           const _SectionLabel('Personal information'),
@@ -410,113 +355,207 @@ class ProfilePage extends StatelessWidget {
   );
 }
 
-class _ProfileHeader extends StatefulWidget {
-  const _ProfileHeader({
+class _ProfileHero extends StatefulWidget {
+  const _ProfileHero({
     required this.name,
     required this.username,
     required this.bio,
     required this.photoUrl,
+    required this.onEdit,
+    required this.onQr,
   });
 
   final String name;
   final String username;
   final String bio;
   final String? photoUrl;
+  final VoidCallback onEdit;
+  final VoidCallback onQr;
 
   @override
-  State<_ProfileHeader> createState() => _ProfileHeaderState();
+  State<_ProfileHero> createState() => _ProfileHeroState();
 }
 
-class _ProfileHeaderState extends State<_ProfileHeader> {
+class _ProfileHeroState extends State<_ProfileHero> {
   bool expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final bio = widget.bio.trim();
+    final photoUrl = widget.photoUrl?.trim();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 43,
-              backgroundColor: primary.withValues(alpha: .10),
-              backgroundImage: widget.photoUrl == null
-                  ? null
-                  : NetworkImage(widget.photoUrl!),
-              child: widget.photoUrl == null
-                  ? Text(
-                      widget.name.characters.first.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: primary,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.topRight,
+          colors: [
+            colors.primary.withValues(alpha: .18),
+            colors.secondary.withValues(alpha: .13),
+            colors.primary.withValues(alpha: .10),
+          ],
+          stops: const [0, 0.5, 1],
+        ),
+        border: Border.all(color: colors.primary.withValues(alpha: .16)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withValues(alpha: .08),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [colors.primary, colors.secondary],
                   ),
-                  if (widget.username.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                ),
+                child: CircleAvatar(
+                  radius: 46,
+                  backgroundColor: colors.surfaceContainerHighest,
+                  backgroundImage: photoUrl == null || photoUrl.isEmpty
+                      ? null
+                      : NetworkImage(photoUrl),
+                  child: photoUrl == null || photoUrl.isEmpty
+                      ? Text(
+                          widget.name.isEmpty
+                              ? '?'
+                              : widget.name.characters.first.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 29,
+                            fontWeight: FontWeight.w900,
+                            color: colors.onSurface,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      '@${widget.username}',
+                      widget.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 24,
+                        height: 1.05,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -.4,
+                        color: colors.onSurface,
                       ),
                     ),
+                    if (widget.username.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '@${widget.username}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
+              ),
+            ],
+          ),
+          if (bio.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Text(
+              bio,
+              maxLines: expanded ? null : 3,
+              overflow: expanded ? null : TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                fontWeight: FontWeight.w500,
+                color: colors.onSurface.withValues(alpha: .90),
               ),
             ),
-          ],
-        ),
-        if (bio.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          Text(
-            bio,
-            maxLines: expanded ? null : 3,
-            overflow: expanded ? null : TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (bio.length > 90)
-            InkWell(
-              onTap: () => setState(() => expanded = !expanded),
-              child: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  expanded ? 'Less' : 'More',
-                  style: TextStyle(
-                    color: primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
+            if (bio.length > 90)
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => setState(() => expanded = !expanded),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 5, right: 8, bottom: 3),
+                  child: Text(
+                    expanded ? 'Less' : 'More',
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
-            ),
+          ],
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: widget.onEdit,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    backgroundColor: colors.primary,
+                    foregroundColor: colors.onPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_rounded, size: 17),
+                  label: const Text(
+                    'Edit Profile',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onQr,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    foregroundColor: colors.onSurface,
+                    backgroundColor: colors.surface.withValues(alpha: .44),
+                    side: BorderSide(
+                      color: colors.outlineVariant.withValues(alpha: .70),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                  label: const Text(
+                    'QR Code',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
-      ],
+      ),
     );
   }
 }
@@ -529,7 +568,11 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
     text,
-    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+    style: TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w900,
+      color: Theme.of(context).colorScheme.onSurface,
+    ),
   );
 }
 
@@ -539,18 +582,18 @@ class _InfoGroup extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: Theme.of(
-          context,
-        ).colorScheme.outlineVariant.withValues(alpha: .55),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .50)),
       ),
-    ),
-    child: Column(children: children),
-  );
+      child: Column(children: children),
+    );
+  }
 }
 
 class _VisibilityInfoRow extends StatelessWidget {
@@ -567,49 +610,75 @@ class _VisibilityInfoRow extends StatelessWidget {
   final VoidCallback onVisibilityTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final icon = switch (label) {
+      'Phone' => Icons.call_outlined,
+      'Email' => Icons.mail_outline_rounded,
+      'Birthday' => Icons.cake_outlined,
+      _ => Icons.info_outline_rounded,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 13, 8, 13),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 19, color: colors.primary),
           ),
-        ),
-        IconButton(
-          tooltip: isPublic ? 'Public' : 'Only me',
-          onPressed: onVisibilityTap,
-          icon: Icon(
-            isPublic ? Icons.public_rounded : Icons.lock_outline_rounded,
-            size: 19,
-            color: isPublic
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.onSurfaceVariant,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white70
+                        : Colors.black54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          IconButton(
+            tooltip: isPublic ? 'Public' : 'Only me',
+            onPressed: onVisibilityTap,
+            icon: Icon(
+              isPublic ? Icons.public_rounded : Icons.lock_outline_rounded,
+              size: 19,
+              color: isPublic
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SoftDivider extends StatelessWidget {

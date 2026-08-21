@@ -102,8 +102,16 @@ class _ContactsPageState extends State<ContactsPage> {
                   stream: contactService.contacts(),
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
-                      return const Center(
-                        child: Text('Unable to load contacts'),
+                      return Center(
+                        child: Text(
+                          'Unable to load contacts',
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black,
+                          ),
+                        ),
                       );
                     }
                     if (!snapshot.hasData) {
@@ -127,7 +135,17 @@ class _ContactsPageState extends State<ContactsPage> {
                           ),
                         );
                     if (users.isEmpty) {
-                      return const Center(child: Text('No contacts yet'));
+                      return Center(
+                        child: Text(
+                          'No contacts yet',
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white70
+                                : Colors.black54,
+                          ),
+                        ),
+                      );
                     }
                     return Stack(
                       children: [
@@ -268,7 +286,10 @@ class _RequestButton extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFFE34B62),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white, width: 1.5),
+                  border: Border.all(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    width: 1.5,
+                  ),
                 ),
                 child: Text(
                   count > 99 ? '99+' : '$count',
@@ -311,7 +332,13 @@ class _ContactTile extends StatelessWidget {
         user.name,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black,
+        ),
       ),
       subtitle: Row(
         children: [
@@ -328,7 +355,12 @@ class _ContactTile extends StatelessWidget {
           const SizedBox(width: 5),
           Text(
             user.isOnline ? 'Available' : 'Offline',
-            style: const TextStyle(fontSize: 11),
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white70
+                  : Colors.black54,
+            ),
           ),
         ],
       ),
@@ -356,11 +388,11 @@ class _ContactAvatar extends StatelessWidget {
 
     Widget fallback() => CircleAvatar(
       radius: 23,
-      backgroundColor: const Color(0xFFE5DAF5),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Text(
         user.name.isEmpty ? '?' : user.name[0].toUpperCase(),
-        style: const TextStyle(
-          color: Color(0xFF65439B),
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -392,7 +424,7 @@ class _ActionIcon extends StatelessWidget {
     visualDensity: VisualDensity.compact,
     constraints: const BoxConstraints(minWidth: 34, minHeight: 38),
     onPressed: onTap,
-    icon: Icon(icon, size: 19, color: const Color(0xFF805BB3)),
+    icon: Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
   );
 }
 

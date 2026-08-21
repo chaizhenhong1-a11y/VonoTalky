@@ -539,3 +539,4 @@ exports.onGroupMessageCreated = onDocumentCreated(
     }
   },
 );
+exports.onCallCreated = require("./call_notifications").onCallCreated;

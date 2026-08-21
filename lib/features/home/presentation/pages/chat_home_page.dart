@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../calls/presentation/widgets/incoming_call_listener.dart';
 import '../../../chat/data/models/chat_user.dart';
 import '../../../chat/data/services/chat_service.dart';
 import '../../../chat/presentation/pages/new_chat_page.dart';
@@ -34,233 +35,245 @@ class _ChatHomePageState extends State<ChatHomePage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    body: Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.topRight,
-          colors: [
-            Theme.of(context).colorScheme.primary.withValues(alpha: .18),
-            Theme.of(context).colorScheme.secondary.withValues(alpha: .13),
-            Theme.of(context).colorScheme.primary.withValues(alpha: .10),
-          ],
-          stops: const [0, 0.5, 1],
+  Widget build(BuildContext context) => IncomingCallListener(
+    child: Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.topRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withValues(alpha: .18),
+              Theme.of(context).colorScheme.secondary.withValues(alpha: .13),
+              Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+            ],
+            stops: const [0, 0.5, 1],
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 10, 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'VonoTalky',
-                      style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(context).colorScheme.primary,
-                        letterSpacing: -0.6,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 14, 10, 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'VonoTalky',
+                        style: TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800,
+                          color: Theme.of(context).colorScheme.primary,
+                          letterSpacing: -0.6,
+                        ),
                       ),
                     ),
-                  ),
-                  _NotificationButton(
-                    onTap: () => _notice('Unread chats are shown below.'),
-                  ),
-                  IconButton(
-                    tooltip: 'Search',
-                    onPressed: () {
-                      searchFocusNode.requestFocus();
-                    },
-                    icon: const Icon(Icons.search_rounded),
-                  ),
-                ],
+                    _NotificationButton(
+                      onTap: () => _notice('Unread chats are shown below.'),
+                    ),
+                    IconButton(
+                      tooltip: 'Search',
+                      onPressed: () {
+                        searchFocusNode.requestFocus();
+                      },
+                      icon: const Icon(Icons.search_rounded),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-              child: TextField(
-                controller: searchController,
-                focusNode: searchFocusNode,
-                textInputAction: TextInputAction.search,
-                onChanged: (value) {
-                  setState(() => query = value.trim().toLowerCase());
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search contacts or groups...',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: query.isEmpty
-                      ? const Icon(Icons.mic_none_rounded)
-                      : IconButton(
-                          tooltip: 'Clear search',
-                          onPressed: _clearSearch,
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                child: TextField(
+                  controller: searchController,
+                  focusNode: searchFocusNode,
+                  textInputAction: TextInputAction.search,
+                  onChanged: (value) {
+                    setState(() => query = value.trim().toLowerCase());
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search contacts or groups...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: query.isEmpty
+                        ? const Icon(Icons.mic_none_rounded)
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: _clearSearch,
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
               ),
-            ),
-            _SectionTitle(query.isEmpty ? 'Top Contacts' : 'Matching Contacts'),
-            Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    top: 27,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(24),
+              _SectionTitle(
+                query.isEmpty ? 'Top Contacts' : 'Matching Contacts',
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      top: 27,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(24),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Column(
-                    children: [
-                      SizedBox(
-                        height: 96,
-                        child: StreamBuilder<List<ChatUser>>(
-                          stream: contactService.contacts(),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              );
-                            }
-                            final contacts = snapshot.data!;
-                            final users = contacts
-                                .where(
-                                  (user) =>
-                                      query.isEmpty ||
-                                      user.name.toLowerCase().contains(query) ||
-                                      user.email.toLowerCase().contains(query),
-                                )
-                                .take(10)
-                                .toList();
-
-                            if (users.isEmpty) {
-                              return Align(
-                                alignment: Alignment.centerLeft,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                  ),
-                                  child: Text(
-                                    query.isEmpty
-                                        ? 'No contacts yet'
-                                        : 'No contacts match "$query"',
-                                    style: const TextStyle(
-                                      color: Color(0xFF756E7C),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                            return ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              itemCount: users.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(width: 13),
-                              itemBuilder: (_, index) {
-                                final user = users[index];
-                                return _TopContact(
-                                  user: user,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          RealChatRoomPage(user: user),
+                    Column(
+                      children: [
+                        SizedBox(
+                          height: 96,
+                          child: StreamBuilder<List<ChatUser>>(
+                            stream: contactService.contacts(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
                                   ),
                                 );
-                              },
-                            );
-                          },
+                              }
+                              final contacts = snapshot.data!;
+                              final users = contacts
+                                  .where(
+                                    (user) =>
+                                        query.isEmpty ||
+                                        user.name.toLowerCase().contains(
+                                          query,
+                                        ) ||
+                                        user.email.toLowerCase().contains(
+                                          query,
+                                        ),
+                                  )
+                                  .take(10)
+                                  .toList();
+
+                              if (users.isEmpty) {
+                                return Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                    ),
+                                    child: Text(
+                                      query.isEmpty
+                                          ? 'No contacts yet'
+                                          : 'No contacts match "$query"',
+                                      style: TextStyle(
+                                        color:
+                                            Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white70
+                                            : Colors.black54,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                itemCount: users.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: 13),
+                                itemBuilder: (_, index) {
+                                  final user = users[index];
+                                  return _TopContact(
+                                    user: user,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            RealChatRoomPage(user: user),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      _SectionTitle(
-                        query.isEmpty ? 'Recent Chats' : 'Matching Chats',
-                      ),
-                      Expanded(child: UnifiedRecentChats(query: query)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      heroTag: null,
-      onPressed: _showCreateMenu,
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      foregroundColor: Colors.white,
-      icon: const Icon(Icons.edit_rounded, size: 19),
-      label: const Text('New Chat'),
-    ),
-    bottomNavigationBar: widget.embedded
-        ? null
-        : NavigationBar(
-            selectedIndex: 0,
-            onDestinationSelected: (index) {
-              if (index == 1) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ContactsPage()),
-                );
-              }
-              if (index == 2) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PetHomePage()),
-                );
-              }
-              if (index == 3) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ProfilePage()),
-                );
-              }
-            },
-            destinations: [
-              NavigationDestination(
-                icon: Icon(Icons.chat_bubble_rounded),
-                label: 'Chats',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.people_outline_rounded),
-                label: 'Contacts',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.pets_rounded),
-                label: 'Pet',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline_rounded),
-                label: 'Profile',
+                        _SectionTitle(
+                          query.isEmpty ? 'Recent Chats' : 'Matching Chats',
+                        ),
+                        Expanded(child: UnifiedRecentChats(query: query)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
+        onPressed: _showCreateMenu,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.edit_rounded, size: 19),
+        label: const Text('New Chat'),
+      ),
+      bottomNavigationBar: widget.embedded
+          ? null
+          : NavigationBar(
+              selectedIndex: 0,
+              onDestinationSelected: (index) {
+                if (index == 1) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ContactsPage()),
+                  );
+                }
+                if (index == 2) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PetHomePage()),
+                  );
+                }
+                if (index == 3) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ProfilePage()),
+                  );
+                }
+              },
+              destinations: [
+                NavigationDestination(
+                  icon: Icon(Icons.chat_bubble_rounded),
+                  label: 'Chats',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.people_outline_rounded),
+                  label: 'Contacts',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.pets_rounded),
+                  label: 'Pet',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline_rounded),
+                  label: 'Profile',
+                ),
+              ],
+            ),
+    ),
   );
 
   void _clearSearch() {
@@ -319,10 +332,12 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 4, 18, 6),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: Color(0xFF211B27),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black,
         ),
       ),
     ),
@@ -397,7 +412,13 @@ class _TopContact extends StatelessWidget {
             user.name.split(' ').first,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
           ),
           Text(
             user.isOnline ? 'online' : 'offline',
@@ -405,7 +426,9 @@ class _TopContact extends StatelessWidget {
               fontSize: 9,
               color: user.isOnline
                   ? const Color(0xFF1EAD6A)
-                  : const Color(0xFF8B8490),
+                  : Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white70
+                  : Colors.black54,
             ),
           ),
         ],
@@ -443,7 +466,7 @@ class _ContactAvatar extends StatelessWidget {
           radius: radius,
           backgroundColor: Theme.of(
             context,
-          ).colorScheme.primary.withValues(alpha: .12),
+          ).colorScheme.surfaceContainerHighest,
           backgroundImage: user.photoUrl == null
               ? null
               : NetworkImage(user.photoUrl!),
@@ -451,7 +474,7 @@ class _ContactAvatar extends StatelessWidget {
               ? Text(
                   user.name[0].toUpperCase(),
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w700,
                   ),
                 )
@@ -468,7 +491,10 @@ class _ContactAvatar extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFF24C77A),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
+              border: Border.all(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                width: 2,
+              ),
             ),
           ),
         ),

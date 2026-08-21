@@ -42,18 +42,20 @@ class _PinnedMessageBannerState extends State<PinnedMessageBanner> {
       final sender = item['sender'] as String? ?? '';
       final type = item['type'] as String? ?? 'text';
 
+      final colors = Theme.of(context).colorScheme;
+
       return Material(
-        color: const Color(0xFFF3ECFA),
+        color: colors.primaryContainer,
         child: InkWell(
           onTap: () => widget.onTap(messageId),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 7, 6, 7),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.push_pin_rounded,
                   size: 19,
-                  color: Color(0xFF7653A5),
+                  color: colors.onPrimaryContainer,
                 ),
                 const SizedBox(width: 9),
                 Expanded(
@@ -67,8 +69,8 @@ class _PinnedMessageBannerState extends State<PinnedMessageBanner> {
                               sender.isEmpty ? 'Pinned message' : sender,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xFF7653A5),
+                              style: TextStyle(
+                                color: colors.onPrimaryContainer,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -77,8 +79,10 @@ class _PinnedMessageBannerState extends State<PinnedMessageBanner> {
                           if (pinned.length > 1)
                             Text(
                               '${index + 1} / ${pinned.length}',
-                              style: const TextStyle(
-                                color: Color(0xFF8A7D95),
+                              style: TextStyle(
+                                color: colors.onPrimaryContainer.withValues(
+                                  alpha: .68,
+                                ),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -89,8 +93,10 @@ class _PinnedMessageBannerState extends State<PinnedMessageBanner> {
                         '${_prefix(type)}$preview',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF5E5865),
+                        style: TextStyle(
+                          color: colors.onPrimaryContainer.withValues(
+                            alpha: .82,
+                          ),
                           fontSize: 12,
                         ),
                       ),
@@ -131,10 +137,10 @@ class _PinnedMessageBannerState extends State<PinnedMessageBanner> {
                       ),
                     ),
                   ),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.list_alt_rounded,
                     size: 19,
-                    color: Color(0xFF756E7C),
+                    color: colors.onPrimaryContainer,
                   ),
                 ),
               ],
