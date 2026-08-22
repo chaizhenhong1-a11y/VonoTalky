@@ -77,6 +77,7 @@ class _ChatBackgroundSwitcher extends StatefulWidget {
 class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
   Timer? _hintTimer;
   bool _showHint = false;
+  bool _collapsed = false;
 
   @override
   void dispose() {
@@ -85,6 +86,13 @@ class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
   }
 
   void _handleTap() {
+    if (_collapsed) {
+      setState(() {
+        _collapsed = false;
+      });
+      return;
+    }
+
     final viewingOther = widget.viewMode == ChatBackgroundViewMode.other;
 
     if (viewingOther) {
@@ -100,6 +108,15 @@ class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
 
     _hideHint();
     widget.onToggle();
+  }
+
+  void _collapse() {
+    _hideHint();
+    if (!mounted || _collapsed) return;
+
+    setState(() {
+      _collapsed = true;
+    });
   }
 
   void _showUnavailableHint() {
@@ -133,46 +150,94 @@ class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
   @override
   Widget build(BuildContext context) {
     final viewingOther = widget.viewMode == ChatBackgroundViewMode.other;
-
     final colorScheme = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      width: 280,
-      height: 42,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: _buildButton(colorScheme, viewingOther),
-          ),
-
-          Positioned(
-            top: 50,
-            right: 0,
-            child: IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: _showHint ? 1 : 0,
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOut,
-                child: AnimatedSlide(
-                  offset: _showHint ? Offset.zero : const Offset(0, -0.12),
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  child: _buildHint(colorScheme),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topRight,
+      child: SizedBox(
+        width: _collapsed ? 42 : 280,
+        height: 42,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: 0,
+              right: 0,
+              child: _collapsed
+                  ? KeyedSubtree(
+                      key: const ValueKey('background-switcher-collapsed'),
+                      child: _buildCollapsedButton(colorScheme),
+                    )
+                  : KeyedSubtree(
+                      key: const ValueKey('background-switcher-expanded'),
+                      child: _buildButton(colorScheme, viewingOther),
+                    ),
+            ),
+            if (!_collapsed)
+              Positioned(
+                top: 50,
+                right: 0,
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _showHint ? 1 : 0,
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOut,
+                    child: AnimatedSlide(
+                      offset: _showHint ? Offset.zero : const Offset(0, -0.12),
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      child: _buildHint(colorScheme),
+                    ),
+                  ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollapsedButton(ColorScheme colorScheme) {
+    return SizedBox(
+      width: 42,
+      height: 42,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          onTap: _handleTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.94),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.wallpaper_rounded,
+              size: 19,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildButton(ColorScheme colorScheme, bool viewingOther) {
     return SizedBox(
-      width: 132,
+      width: 150,
       height: 42,
       child: Material(
         color: Colors.transparent,
@@ -182,7 +247,7 @@ class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
           borderRadius: BorderRadius.circular(24),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.only(left: 12, right: 6),
             decoration: BoxDecoration(
               color: viewingOther
                   ? colorScheme.primaryContainer.withValues(alpha: 0.94)
@@ -244,6 +309,24 @@ class _ChatBackgroundSwitcherState extends State<_ChatBackgroundSwitcher> {
                   color: viewingOther
                       ? colorScheme.primary
                       : colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 2),
+                IconButton(
+                  tooltip: 'Collapse background switcher',
+                  onPressed: _collapse,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  icon: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: viewingOther
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

@@ -484,3 +484,112 @@
 - Kept theme colors for the Hero gradient, icons, buttons, and intentional accent states.
 - No Profile data, Firestore, pet showcase, QR, navigation, or visibility behavior was changed.
 
+## Phase 107.0.8.11
+
+### Changed
+
+- Added full Light/Dark theme support to the group chat room.
+- Group AppBar, chat background, message bubbles, composer, reaction chips, and voice controls now adapt to the active theme.
+- Group message body text now uses black in Light Mode and white in Dark Mode.
+- Group message metadata uses black54/black45 in Light Mode and white70/white60 in Dark Mode.
+- Theme accent colors remain for intentional emphasis such as sender names, read states, actions, and send controls.
+- Pinned-message behavior continues to reuse the shared theme-aware `PinnedMessageBanner`.
+- No group messaging, Firestore, reactions, pinning, recall, voice, attachment, draft, or navigation logic was changed.
+
+## Phase 107.0.8.11.1
+
+### Fixed
+
+- Fixed group-chat analyzer errors caused by `colors` and `isDark` being referenced outside the `build()` method scope.
+- `_voiceHoldButton()` now resolves its own `ColorScheme` and brightness from `Theme.of(context)`.
+- No visual behavior or group-chat functionality was changed.
+
+## Phase 107.0.8.13.1
+
+### Fixed
+
+- Fixed the group-chat composer wrapping into a visually two-line layout on narrow phones.
+- Group chat now uses the same compact-width composer behavior as direct chat.
+- Mic, text field, Emoji, Add, and Send controls remain on one horizontal row on compact screens.
+- Reduced horizontal pressure under 390 logical pixels using tighter padding, compact button density, and smaller minimum control sizes.
+- Multi-line input still grows upward instead of pushing action buttons onto another row.
+- No group messaging, voice, emoji, attachment, draft, reaction, or Dark Mode behavior was changed.
+
+## Phase 107.0.8.13.2
+
+### Fixed
+
+- Removed the remaining stale `const` wrapper around a narrow-screen `MediaQuery.sizeOf(context)` expression in the group composer.
+- Fixes the `Methods can't be invoked in constant expressions` analyzer error near line 542.
+- No group-chat layout or behavior was otherwise changed.
+
+## Phase 107.0.8.14
+
+### Restored
+
+- Restored the compact/collapsible chat background switcher in direct chat.
+- The expanded background switcher now includes a dedicated collapse control.
+- Collapsed mode uses a 42x42 circular wallpaper button so it does not cover chat content.
+- Tapping the compact wallpaper button expands the full Mine/other-background switcher again.
+- Existing background toggle behavior, unavailable-background hint, theme adaptation, and background state logic remain unchanged.
+
+## Phase 107.0.8.14.1
+
+### Fixed
+
+- Fixed repeated `BoxDecoration.debugAssertIsValid()` assertions when collapsing or expanding the direct-chat background switcher.
+- Expanded and collapsed switcher states now use distinct keyed subtrees so Flutter does not interpolate between a rounded rectangle and a circular decoration.
+- Removed the unnecessary decoration animation from the collapsed circular button.
+- Preserved the existing collapse/expand size animation, background switching behavior, Dark Mode, and unavailable-background hint.
+
+## Phase 107.0.9.0
+
+### Added
+
+- Added real VonoTalky profile QR scanning from the Contacts page.
+- Added a camera scanner flow backed by `mobile_scanner` for VonoTalky QR payloads in the existing `vonotalky://user/{uid}` format.
+- Added strict QR parsing so unrelated QR codes are rejected instead of being treated as user IDs.
+- Added scanned-user lookup through the existing Firestore `users` collection.
+- Added a scanned-profile preview with avatar, name, email, current relationship state, and Add Friend action.
+- Reused the existing `ContactService.sendRequest()` friend-request workflow instead of creating a second friendship system.
+- Added handling for own QR code, missing users, invalid QR codes, pending requests, existing contacts, previously declined requests, repeated detections, and scanner resume behavior.
+- Added a QR scanner entry button to the Contacts header.
+- Added Android camera permission and updated the iOS camera usage description for QR scanning.
+- Added `mobile_scanner` dependency.
+
+## Phase 107.0.9.1
+
+### Changed
+
+- Redesigned the scanned-profile page into a compact contact-profile layout.
+- Moved the profile avatar to the left with display name and username aligned beside it.
+- Moved Bio into its own left-aligned section below the identity row.
+- Bio now renders in full with no `maxLines` or ellipsis truncation.
+- Removed email/contact-info content and the extra relationship status card from the scanned-profile UI.
+- Existing contacts now see a direct `Message` action that opens the existing direct chat room.
+- New users see `Add Friend`; pending requests show `Request Pending`.
+- QR lookup now also reads the existing `username` and `bio` profile fields directly from the scanned user's Firestore profile document.
+- Preserved Light/Dark text behavior and the existing friend-request flow.
+
+## Phase 107.0.9.2
+
+### Changed
+
+- Polished the scanned-profile UI with theme-driven visual depth while preserving the compact profile structure.
+- Added a subtle theme-based identity surface using `primary`, `secondary`, and surface colors instead of hard-coded purple.
+- Added a theme-aware framed avatar with a light shadow.
+- Converted the username into a compact `primaryContainer` pill.
+- Moved Bio into a dedicated theme-aware surface card with a small quote accent.
+- Bio remains fully visible, left-aligned, and untruncated.
+- Refined the primary action spacing and added a QR icon to `Scan another code`.
+- All Light/Dark behavior follows the active `ColorScheme`; no fixed accent color was introduced.
+
+## Phase 107.0.9.3
+
+### Changed
+
+- Matched the scanned-profile identity gradient exactly to the current Chat Home gradient.
+- Uses the same top-left to top-right direction, `primary` / `secondary` / `primary` color sequence, alpha values `.18 / .13 / .10`, and stops `0 / 0.5 / 1`.
+- The gradient therefore follows the active app theme in exactly the same way as Chat Home.
+- Preserved the left-side avatar, username pill, full Bio card, and Message/Add Friend behavior.
+

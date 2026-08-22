@@ -7,6 +7,7 @@ import '../../data/models/friend_request.dart';
 import '../../data/services/contact_service.dart';
 import 'add_contact_page.dart';
 import 'contact_detail_page.dart';
+import 'contact_qr_scanner_page.dart';
 import 'friend_requests_page.dart';
 
 class ContactsPage extends StatefulWidget {
@@ -54,6 +55,16 @@ class _ContactsPageState extends State<ContactsPage> {
                         letterSpacing: -0.6,
                       ),
                     ),
+                  ),
+                  IconButton(
+                    tooltip: 'Scan QR code',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ContactQrScannerPage(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
                   ),
                   _RequestButton(
                     service: contactService,

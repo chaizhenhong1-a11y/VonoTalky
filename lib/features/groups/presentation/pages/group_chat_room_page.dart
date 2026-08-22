@@ -76,487 +76,606 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      toolbarHeight: 82,
-      backgroundColor: const Color(0xFFE9E3FA),
-      surfaceTintColor: Colors.transparent,
-      title: Row(
-        children: [
-          CircleAvatar(
-            radius: 23,
-            backgroundColor: const Color(0xFFDCCFF3),
-            backgroundImage: widget.group.photoUrl == null
-                ? null
-                : NetworkImage(widget.group.photoUrl!),
-            child: widget.group.photoUrl == null
-                ? Text(widget.group.name[0].toUpperCase())
-                : null,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.group.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  '${widget.group.memberCount} members',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF605968),
-                  ),
-                ),
-              ],
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 82,
+        backgroundColor: Color.alphaBlend(
+          colors.primary.withValues(alpha: isDark ? .16 : .12),
+          colors.surface,
+        ),
+        surfaceTintColor: Colors.transparent,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 23,
+              backgroundColor: colors.surfaceContainerHighest,
+              backgroundImage: widget.group.photoUrl == null
+                  ? null
+                  : NetworkImage(widget.group.photoUrl!),
+              child: widget.group.photoUrl == null
+                  ? Text(
+                      widget.group.name[0].toUpperCase(),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : null,
             ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.group.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  Text(
+                    '${widget.group.memberCount} members',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Search messages',
+            onPressed: _openGroupSearch,
+            icon: const Icon(Icons.search_rounded),
+          ),
+          IconButton(
+            onPressed: () => _notice('Group video call is coming next.'),
+            icon: const Icon(Icons.videocam_outlined),
+          ),
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => GroupDetailsPage(groupId: widget.group.id),
+              ),
+            ),
+            icon: const Icon(Icons.info_outline_rounded),
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          tooltip: 'Search messages',
-          onPressed: _openGroupSearch,
-          icon: const Icon(Icons.search_rounded),
-        ),
-        IconButton(
-          onPressed: () => _notice('Group video call is coming next.'),
-          icon: const Icon(Icons.videocam_outlined),
-        ),
-        IconButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => GroupDetailsPage(groupId: widget.group.id),
+      body: Container(
+        color: isDark ? const Color(0xFF111820) : const Color(0xFFEDF2F8),
+        child: Column(
+          children: [
+            PinnedMessageBanner(
+              title: 'Pinned Messages',
+              preferenceId: 'group_${widget.group.id}',
+              stream: pinnedMessageService.groupPreferences(widget.group.id),
+              onTap: (messageId) => _jumpToMessage(messageId, latestMessages),
+              onRemove: (messageId) =>
+                  pinnedMessageService.removeGroup(widget.group.id, messageId),
             ),
-          ),
-          icon: const Icon(Icons.info_outline_rounded),
-        ),
-      ],
-    ),
-    body: Container(
-      color: const Color(0xFFEDF2F8),
-      child: Column(
-        children: [
-          PinnedMessageBanner(
-            title: 'Pinned Messages',
-            preferenceId: 'group_${widget.group.id}',
-            stream: pinnedMessageService.groupPreferences(widget.group.id),
-            onTap: (messageId) => _jumpToMessage(messageId, latestMessages),
-            onRemove: (messageId) =>
-                pinnedMessageService.removeGroup(widget.group.id, messageId),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: service.messages(widget.group.id),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => service.markRead(widget.group.id),
-                );
-                final messages = snapshot.data!.docs;
-                latestMessages = messages;
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Text('Start chatting in ${widget.group.name}'),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: service.messages(widget.group.id),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => service.markRead(widget.group.id),
                   );
-                }
-                return ListView.builder(
-                  controller: messageScrollController,
-                  reverse: true,
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-                  itemCount: messages.length,
-                  itemBuilder: (_, index) {
-                    final document = messages[index];
-                    final data = document.data();
-                    final mine = data['senderId'] == service.myId;
-                    final deleted = data['isDeleted'] as bool? ?? false;
-                    final sentAt = (data['sentAt'] as Timestamp?)?.toDate();
-                    final readBy = List<String>.from(
-                      data['readBy'] as List? ?? const [],
-                    );
-                    final reactions = Map<String, dynamic>.from(
-                      data['reactions'] as Map? ?? const {},
-                    );
-                    final replyData = data['replyTo'];
-                    final reply = replyData is Map
-                        ? MessageReply.fromMap(
-                            Map<String, dynamic>.from(replyData),
-                          )
-                        : null;
-                    return Align(
-                      alignment: mine
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: GestureDetector(
-                        onDoubleTap: deleted
-                            ? null
-                            : () => _toggleReaction(document.id, '❤️'),
-                        onLongPress: deleted
-                            ? null
-                            : () => _showActions(document.id, data, mine),
-                        child: Container(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * .78,
-                          ),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 13,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: mine
-                                ? const Color(0xFFCDBCEB)
-                                : const Color(0xFFFFFCF3),
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(17),
-                              topRight: const Radius.circular(17),
-                              bottomLeft: Radius.circular(mine ? 17 : 5),
-                              bottomRight: Radius.circular(mine ? 5 : 17),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!mine)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    data['senderName'] as String? ?? 'Member',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF7150A1),
-                                    ),
-                                  ),
-                                ),
-                              if (reply != null)
-                                MessageReplyCard(
-                                  reply: reply,
-                                  onTap: () =>
-                                      _jumpToMessage(reply.messageId, messages),
-                                ),
-                              if (deleted)
-                                const Text(
-                                  'This message was recalled',
-                                  style: TextStyle(fontStyle: FontStyle.italic),
-                                )
-                              else if (data['type'] == 'image')
-                                GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => MediaViewerPage(
-                                        url: data['imageUrl'] as String,
-                                        name: 'VonoTalky_${document.id}.jpg',
-                                      ),
-                                    ),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(
-                                      data['imageUrl'] as String,
-                                      width: 230,
-                                      height: 230,
-                                      fit: BoxFit.cover,
-                                      loadingBuilder: (_, child, loading) =>
-                                          loading == null
-                                          ? child
-                                          : const Center(
-                                              child: CircularProgressIndicator(
-                                                color: Color(0xFFB49ADF),
-                                              ),
-                                            ),
-                                      errorBuilder: (_, _, _) => const SizedBox(
-                                        width: 230,
-                                        height: 230,
-                                        child: Center(
-                                          child: Icon(
-                                            Icons.broken_image_outlined,
-                                            size: 42,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              else if (data['type'] == 'file')
-                                FileMessageBubble(
-                                  name: data['fileName'] as String? ?? 'File',
-                                  url: data['fileUrl'] as String,
-                                  size: data['fileSize'] as int? ?? 0,
-                                  mine: mine,
-                                )
-                              else if (data['type'] == 'voice')
-                                VoiceMessageBubble(
-                                  url: data['audioUrl'] as String,
-                                  durationMs: data['durationMs'] as int? ?? 0,
-                                  mine: mine,
-                                )
-                              else
-                                Text(data['text'] as String? ?? ''),
-                              const SizedBox(height: 3),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                widthFactor: 1,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      _time(sentAt),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Color(0xFF716A78),
-                                      ),
-                                    ),
-                                    if (data['editedAt'] != null) ...[
-                                      const SizedBox(width: 4),
-                                      const Text(
-                                        'edited',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          color: Color(0xFF8B8293),
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                    if (mine) ...[
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        readBy.length > 1
-                                            ? Icons.done_all_rounded
-                                            : Icons.done_rounded,
-                                        size: 14,
-                                        color: readBy.length > 1
-                                            ? const Color(0xFF7150A1)
-                                            : const Color(0xFF8C8296),
-                                      ),
-                                      if (readBy.length > 1) ...[
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          '${readBy.length - 1}',
-                                          style: const TextStyle(
-                                            fontSize: 9,
-                                            color: Color(0xFF7150A1),
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              if (reactions.isNotEmpty) ...[
-                                const SizedBox(height: 5),
-                                Wrap(
-                                  spacing: 5,
-                                  runSpacing: 4,
-                                  children: reactions.entries.map((entry) {
-                                    final users = List<String>.from(
-                                      entry.value as List? ?? const [],
-                                    );
-                                    final reactedByMe = users.contains(
-                                      service.myId,
-                                    );
-                                    return InkWell(
-                                      onTap: () => _toggleReaction(
-                                        document.id,
-                                        entry.key,
-                                      ),
-                                      borderRadius: BorderRadius.circular(14),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 7,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: reactedByMe
-                                              ? const Color(0xFFE2D4F5)
-                                              : const Color(0xFFF4EFF8),
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '${entry.key} ${users.length}',
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
-                            ],
-                          ),
+                  final messages = snapshot.data!.docs;
+                  latestMessages = messages;
+                  if (messages.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'Start chatting in ${widget.group.name}',
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : Colors.black54,
                         ),
                       ),
                     );
-                  },
-                );
-              },
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (replyingTo != null)
-                    ReplyComposerBar(
-                      reply: replyingTo!,
-                      onClose: () => setState(() => replyingTo = null),
-                    ),
-                  if (replyingTo != null) const SizedBox(height: 5),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(color: const Color(0xFFE1DCE8)),
-                    ),
-                    child: recording
-                        ? RecordingComposer(
-                            seconds: voiceSeconds,
-                            uploading: uploading,
-                            onCancel: _cancelRecording,
-                            onSend: _sendRecording,
-                          )
-                        : Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                onPressed: uploading || sending
-                                    ? null
-                                    : _toggleVoiceInputMode,
-                                tooltip: voiceInputMode
-                                    ? 'Switch to keyboard'
-                                    : 'Switch to voice',
-                                style: IconButton.styleFrom(
-                                  foregroundColor: const Color(0xFF5F3F86),
-                                ),
-                                icon: Icon(
-                                  voiceInputMode
-                                      ? Icons.keyboard_alt_outlined
-                                      : Icons.mic_none_rounded,
-                                  size: 24,
-                                ),
+                  }
+                  return ListView.builder(
+                    controller: messageScrollController,
+                    reverse: true,
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                    itemCount: messages.length,
+                    itemBuilder: (_, index) {
+                      final document = messages[index];
+                      final data = document.data();
+                      final mine = data['senderId'] == service.myId;
+                      final deleted = data['isDeleted'] as bool? ?? false;
+                      final sentAt = (data['sentAt'] as Timestamp?)?.toDate();
+                      final readBy = List<String>.from(
+                        data['readBy'] as List? ?? const [],
+                      );
+                      final reactions = Map<String, dynamic>.from(
+                        data['reactions'] as Map? ?? const {},
+                      );
+                      final replyData = data['replyTo'];
+                      final reply = replyData is Map
+                          ? MessageReply.fromMap(
+                              Map<String, dynamic>.from(replyData),
+                            )
+                          : null;
+                      return Align(
+                        alignment: mine
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: GestureDetector(
+                          onDoubleTap: deleted
+                              ? null
+                              : () => _toggleReaction(document.id, '❤️'),
+                          onLongPress: deleted
+                              ? null
+                              : () => _showActions(document.id, data, mine),
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * .78,
+                            ),
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 13,
+                              vertical: 9,
+                            ),
+                            decoration: BoxDecoration(
+                              color: mine
+                                  ? colors.primaryContainer
+                                  : colors.surfaceContainerHighest,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(17),
+                                topRight: const Radius.circular(17),
+                                bottomLeft: Radius.circular(mine ? 17 : 5),
+                                bottomRight: Radius.circular(mine ? 5 : 17),
                               ),
-                              if (voiceInputMode)
-                                _voiceHoldButton()
-                              else
-                                Expanded(
-                                  child: TextField(
-                                    controller: controller,
-                                    focusNode: messageFocusNode,
-                                    textAlignVertical: TextAlignVertical.center,
-                                    minLines: 1,
-                                    maxLines: 4,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Message the group...',
-                                      border: InputBorder.none,
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.symmetric(
-                                        vertical: 10,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (!mine)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(
+                                      data['senderName'] as String? ?? 'Member',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: colors.primary,
                                       ),
                                     ),
-                                    onTap: () {
-                                      if (showEmojiPicker) {
-                                        setState(() => showEmojiPicker = false);
-                                      }
-                                    },
-                                    onChanged: (_) {
-                                      _scheduleDraftSave();
-                                      setState(() {});
-                                    },
-                                    onSubmitted: (_) => _sendText(),
                                   ),
-                                ),
-                              IconButton(
-                                onPressed: voiceInputMode
-                                    ? null
-                                    : _toggleEmojiPicker,
-                                style: IconButton.styleFrom(
-                                  foregroundColor: const Color(0xFF5F3F86),
-                                ),
-                                icon: Icon(
-                                  showEmojiPicker
-                                      ? Icons.sentiment_satisfied_alt_rounded
-                                      : Icons.sentiment_satisfied_alt_outlined,
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: uploading
-                                    ? null
-                                    : _showAttachmentMenu,
-                                style: IconButton.styleFrom(
-                                  foregroundColor: const Color(0xFF5F3F86),
-                                ),
-                                icon: uploading
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
+                                if (reply != null)
+                                  MessageReplyCard(
+                                    reply: reply,
+                                    onTap: () => _jumpToMessage(
+                                      reply.messageId,
+                                      messages,
+                                    ),
+                                  ),
+                                if (deleted)
+                                  Text(
+                                    'This message was recalled',
+                                    style: TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : Colors.black54,
+                                    ),
+                                  )
+                                else if (data['type'] == 'image')
+                                  GestureDetector(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => MediaViewerPage(
+                                          url: data['imageUrl'] as String,
+                                          name: 'VonoTalky_${document.id}.jpg',
                                         ),
-                                      )
-                                    : const Icon(
-                                        Icons.add_circle_outline_rounded,
-                                        size: 25,
                                       ),
-                              ),
-                              if (!voiceInputMode &&
-                                  controller.text.trim().isNotEmpty)
-                                IconButton.filled(
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: const Color(0xFF7653A5),
-                                    foregroundColor: Colors.white,
-                                    disabledBackgroundColor: const Color(
-                                      0xFFD9CDE8,
                                     ),
-                                    disabledForegroundColor: Colors.white70,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        data['imageUrl'] as String,
+                                        width: 230,
+                                        height: 230,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (_, child, loading) =>
+                                            loading == null
+                                            ? child
+                                            : const Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: Color(0xFFB49ADF),
+                                                    ),
+                                              ),
+                                        errorBuilder: (_, _, _) =>
+                                            const SizedBox(
+                                              width: 230,
+                                              height: 230,
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.broken_image_outlined,
+                                                  size: 42,
+                                                ),
+                                              ),
+                                            ),
+                                      ),
+                                    ),
+                                  )
+                                else if (data['type'] == 'file')
+                                  FileMessageBubble(
+                                    name: data['fileName'] as String? ?? 'File',
+                                    url: data['fileUrl'] as String,
+                                    size: data['fileSize'] as int? ?? 0,
+                                    mine: mine,
+                                  )
+                                else if (data['type'] == 'voice')
+                                  VoiceMessageBubble(
+                                    url: data['audioUrl'] as String,
+                                    durationMs: data['durationMs'] as int? ?? 0,
+                                    mine: mine,
+                                  )
+                                else
+                                  Text(
+                                    data['text'] as String? ?? '',
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black,
+                                    ),
                                   ),
+                                const SizedBox(height: 3),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  widthFactor: 1,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _time(sentAt),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.black54,
+                                        ),
+                                      ),
+                                      if (data['editedAt'] != null) ...[
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'edited',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: isDark
+                                                ? Colors.white60
+                                                : Colors.black45,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                      if (mine) ...[
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          readBy.length > 1
+                                              ? Icons.done_all_rounded
+                                              : Icons.done_rounded,
+                                          size: 14,
+                                          color: readBy.length > 1
+                                              ? colors.primary
+                                              : (isDark
+                                                    ? Colors.white60
+                                                    : Colors.black45),
+                                        ),
+                                        if (readBy.length > 1) ...[
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            '${readBy.length - 1}',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              color: colors.primary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                if (reactions.isNotEmpty) ...[
+                                  const SizedBox(height: 5),
+                                  Wrap(
+                                    spacing: 5,
+                                    runSpacing: 4,
+                                    children: reactions.entries.map((entry) {
+                                      final users = List<String>.from(
+                                        entry.value as List? ?? const [],
+                                      );
+                                      final reactedByMe = users.contains(
+                                        service.myId,
+                                      );
+                                      return InkWell(
+                                        onTap: () => _toggleReaction(
+                                          document.id,
+                                          entry.key,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 7,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: reactedByMe
+                                                ? colors.primaryContainer
+                                                : colors
+                                                      .surfaceContainerHighest,
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${entry.key} ${users.length}',
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (replyingTo != null)
+                      ReplyComposerBar(
+                        reply: replyingTo!,
+                        onClose: () => setState(() => replyingTo = null),
+                      ),
+                    if (replyingTo != null) const SizedBox(height: 5),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: MediaQuery.sizeOf(context).width < 390
+                            ? 1
+                            : 4,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: colors.outlineVariant),
+                      ),
+                      child: recording
+                          ? RecordingComposer(
+                              seconds: voiceSeconds,
+                              uploading: uploading,
+                              onCancel: _cancelRecording,
+                              onSend: _sendRecording,
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                IconButton(
                                   onPressed: uploading || sending
                                       ? null
-                                      : _sendText,
-                                  icon: sending
+                                      : _toggleVoiceInputMode,
+                                  tooltip: voiceInputMode
+                                      ? 'Switch to keyboard'
+                                      : 'Switch to voice',
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: colors.primary,
+                                    minimumSize:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? const Size(36, 40)
+                                        : null,
+                                    padding:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? EdgeInsets.zero
+                                        : null,
+                                    visualDensity:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? const VisualDensity(
+                                            horizontal: -3,
+                                            vertical: -2,
+                                          )
+                                        : VisualDensity.compact,
+                                  ),
+                                  icon: Icon(
+                                    voiceInputMode
+                                        ? Icons.keyboard_alt_outlined
+                                        : Icons.mic_none_rounded,
+                                    size: 24,
+                                  ),
+                                ),
+                                if (voiceInputMode)
+                                  _voiceHoldButton()
+                                else
+                                  Expanded(
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        minHeight:
+                                            MediaQuery.sizeOf(context).width <
+                                                390
+                                            ? 38
+                                            : 42,
+                                        maxHeight: 104,
+                                      ),
+                                      child: TextField(
+                                        controller: controller,
+                                        focusNode: messageFocusNode,
+                                        textAlignVertical:
+                                            TextAlignVertical.center,
+                                        minLines: 1,
+                                        maxLines: 4,
+                                        decoration: InputDecoration(
+                                          hintText: 'Message the group...',
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.symmetric(
+                                            vertical:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? 8
+                                                : 10,
+                                          ),
+                                        ),
+                                        onTap: () {
+                                          if (showEmojiPicker) {
+                                            setState(
+                                              () => showEmojiPicker = false,
+                                            );
+                                          }
+                                        },
+                                        onChanged: (_) {
+                                          _scheduleDraftSave();
+                                          setState(() {});
+                                        },
+                                        onSubmitted: (_) => _sendText(),
+                                      ),
+                                    ),
+                                  ),
+                                IconButton(
+                                  onPressed: voiceInputMode
+                                      ? null
+                                      : _toggleEmojiPicker,
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: colors.primary,
+                                    minimumSize:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? const Size(36, 40)
+                                        : null,
+                                    padding:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? EdgeInsets.zero
+                                        : null,
+                                    visualDensity:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? const VisualDensity(
+                                            horizontal: -3,
+                                            vertical: -2,
+                                          )
+                                        : VisualDensity.compact,
+                                  ),
+                                  icon: Icon(
+                                    showEmojiPicker
+                                        ? Icons.sentiment_satisfied_alt_rounded
+                                        : Icons
+                                              .sentiment_satisfied_alt_outlined,
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: uploading
+                                      ? null
+                                      : _showAttachmentMenu,
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: colors.primary,
+                                    minimumSize:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? const Size(36, 40)
+                                        : null,
+                                    padding:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? EdgeInsets.zero
+                                        : null,
+                                    visualDensity:
+                                        MediaQuery.sizeOf(context).width < 390
+                                        ? const VisualDensity(
+                                            horizontal: -3,
+                                            vertical: -2,
+                                          )
+                                        : VisualDensity.compact,
+                                  ),
+                                  icon: uploading
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
-                                            strokeWidth: 2.2,
-                                            color: Colors.white,
+                                            strokeWidth: 2,
                                           ),
                                         )
                                       : const Icon(
-                                          Icons.send_rounded,
-                                          size: 19,
+                                          Icons.add_circle_outline_rounded,
+                                          size: 25,
                                         ),
                                 ),
-                            ],
-                          ),
-                  ),
-                  if (showEmojiPicker)
-                    ChatEmojiPicker(onSelected: _insertEmoji),
-                ],
+                                if (!voiceInputMode &&
+                                    controller.text.trim().isNotEmpty)
+                                  IconButton.filled(
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: colors.primary,
+                                      foregroundColor: colors.onPrimary,
+                                      minimumSize:
+                                          MediaQuery.sizeOf(context).width < 390
+                                          ? const Size(38, 40)
+                                          : null,
+                                      padding:
+                                          MediaQuery.sizeOf(context).width < 390
+                                          ? EdgeInsets.zero
+                                          : null,
+                                      disabledBackgroundColor: colors.onSurface
+                                          .withValues(alpha: .12),
+                                      disabledForegroundColor: colors.onSurface
+                                          .withValues(alpha: .38),
+                                    ),
+                                    onPressed: uploading || sending
+                                        ? null
+                                        : _sendText,
+                                    icon: sending
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.send_rounded,
+                                            size: 19,
+                                          ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                    if (showEmojiPicker)
+                      ChatEmojiPicker(onSelected: _insertEmoji),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Future<void> _openGroupSearch() async {
     final messageId = await Navigator.push<String>(
@@ -764,46 +883,49 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
     if (mounted) setState(() => voiceCancelArmed = false);
   }
 
-  Widget _voiceHoldButton() => Expanded(
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onLongPressStart: (_) => _beginHoldToTalk(),
-      onLongPressMoveUpdate: _updateHoldToTalk,
-      onLongPressEnd: (_) => _finishHoldToTalk(),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: voiceCancelArmed
-              ? const Color(0xFFF7D9DE)
-              : recording
-              ? const Color(0xFFE5D8F5)
-              : const Color(0xFFF7F4FA),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
+  Widget _voiceHoldButton() {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPressStart: (_) => _beginHoldToTalk(),
+        onLongPressMoveUpdate: _updateHoldToTalk,
+        onLongPressEnd: (_) => _finishHoldToTalk(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
             color: voiceCancelArmed
-                ? const Color(0xFFC85B70)
-                : const Color(0xFFD8CBE8),
+                ? colors.errorContainer
+                : recording
+                ? colors.primaryContainer
+                : colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: voiceCancelArmed ? colors.error : colors.outlineVariant,
+            ),
           ),
-        ),
-        child: Text(
-          voiceCancelArmed
-              ? 'Release to cancel'
-              : recording
-              ? 'Release to send · Slide up to cancel'
-              : 'Hold to talk',
-          style: TextStyle(
-            color: voiceCancelArmed
-                ? const Color(0xFFB33F58)
-                : const Color(0xFF4E3B63),
-            fontWeight: FontWeight.w700,
-            fontSize: recording ? 12 : 14,
+          child: Text(
+            voiceCancelArmed
+                ? 'Release to cancel'
+                : recording
+                ? 'Release to send · Slide up to cancel'
+                : 'Hold to talk',
+            style: TextStyle(
+              color: voiceCancelArmed
+                  ? colors.onErrorContainer
+                  : (isDark ? Colors.white : Colors.black),
+              fontWeight: FontWeight.w700,
+              fontSize: recording ? 12 : 14,
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Future<void> _startRecording() async {
     if (!await voiceService.start() || !mounted) {
@@ -1017,7 +1139,7 @@ class _GroupChatRoomPageState extends State<GroupChatRoomPage> {
           margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(sheetContext).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Wrap(

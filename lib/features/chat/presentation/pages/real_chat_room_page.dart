@@ -1776,8 +1776,11 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                               ),
                             if (replyingTo != null) const SizedBox(height: 5),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
+                              padding: EdgeInsets.symmetric(
+                                horizontal:
+                                    MediaQuery.sizeOf(context).width < 390
+                                    ? 1
+                                    : 4,
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
@@ -1799,7 +1802,14 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                           CrossAxisAlignment.center,
                                       children: [
                                         IconButton(
-                                          visualDensity: VisualDensity.compact,
+                                          visualDensity:
+                                              MediaQuery.sizeOf(context).width <
+                                                  390
+                                              ? const VisualDensity(
+                                                  horizontal: -3,
+                                                  vertical: -2,
+                                                )
+                                              : VisualDensity.compact,
                                           onPressed: uploading || sending
                                               ? null
                                               : _toggleVoiceInputMode,
@@ -1808,6 +1818,20 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                               : 'Switch to voice',
                                           style: IconButton.styleFrom(
                                             foregroundColor: colors.primary,
+                                            minimumSize:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? const Size(36, 40)
+                                                : null,
+                                            padding:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? EdgeInsets.zero
+                                                : null,
                                           ),
                                           icon: Icon(
                                             voiceInputMode
@@ -1821,8 +1845,14 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                         else
                                           Expanded(
                                             child: ConstrainedBox(
-                                              constraints: const BoxConstraints(
-                                                minHeight: 42,
+                                              constraints: BoxConstraints(
+                                                minHeight:
+                                                    MediaQuery.sizeOf(
+                                                          context,
+                                                        ).width <
+                                                        390
+                                                    ? 38
+                                                    : 42,
                                                 maxHeight: 104,
                                               ),
                                               child: TextField(
@@ -1887,8 +1917,14 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                   border: InputBorder.none,
                                                   isDense: true,
                                                   contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 11,
+                                                      EdgeInsets.symmetric(
+                                                        vertical:
+                                                            MediaQuery.sizeOf(
+                                                                  context,
+                                                                ).width <
+                                                                390
+                                                            ? 8
+                                                            : 11,
                                                       ),
                                                   suffixIcon:
                                                       controller.text.isEmpty
@@ -1899,8 +1935,17 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                                           tooltip:
                                                               'Clear message',
                                                           visualDensity:
-                                                              VisualDensity
-                                                                  .compact,
+                                                              MediaQuery.sizeOf(
+                                                                    context,
+                                                                  ).width <
+                                                                  390
+                                                              ? const VisualDensity(
+                                                                  horizontal:
+                                                                      -3,
+                                                                  vertical: -2,
+                                                                )
+                                                              : VisualDensity
+                                                                    .compact,
                                                           icon: const Icon(
                                                             Icons
                                                                 .cancel_rounded,
@@ -1930,6 +1975,20 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                               : 'Open emoji picker',
                                           style: IconButton.styleFrom(
                                             foregroundColor: colors.primary,
+                                            minimumSize:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? const Size(36, 40)
+                                                : null,
+                                            padding:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? EdgeInsets.zero
+                                                : null,
                                           ),
                                           icon: Icon(
                                             showEmojiPicker
@@ -1940,13 +1999,34 @@ class _RealChatRoomViewState extends State<_RealChatRoomView> {
                                           ),
                                         ),
                                         IconButton(
-                                          visualDensity: VisualDensity.compact,
+                                          visualDensity:
+                                              MediaQuery.sizeOf(context).width <
+                                                  390
+                                              ? const VisualDensity(
+                                                  horizontal: -3,
+                                                  vertical: -2,
+                                                )
+                                              : VisualDensity.compact,
                                           onPressed: uploading
                                               ? null
                                               : _showImageSource,
                                           tooltip: 'More',
                                           style: IconButton.styleFrom(
                                             foregroundColor: colors.primary,
+                                            minimumSize:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? const Size(36, 40)
+                                                : null,
+                                            padding:
+                                                MediaQuery.sizeOf(
+                                                      context,
+                                                    ).width <
+                                                    390
+                                                ? EdgeInsets.zero
+                                                : null,
                                           ),
                                           icon: uploading
                                               ? const SizedBox(

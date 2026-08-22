@@ -29,7 +29,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>VonoTalky needs microphone access for voice calls.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>VonoTalky needs camera access for video calls.</string>
+	<string>VonoTalky needs camera access for QR scanning and video calls.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

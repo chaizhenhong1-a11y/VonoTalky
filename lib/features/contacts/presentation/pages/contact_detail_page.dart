@@ -22,7 +22,7 @@ class ContactDetailPage extends StatelessWidget {
     builder: (context, userSnapshot) {
       final current = userSnapshot.data ?? user;
       return Scaffold(
-        backgroundColor: const Color(0xFFF7F4F9),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _Header(user: current)),
@@ -84,7 +84,9 @@ class ContactDetailPage extends StatelessWidget {
                   ),
 
                   Material(
-                    color: Colors.white,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
@@ -120,7 +122,7 @@ class ContactDetailPage extends StatelessWidget {
 
                             const SizedBox(width: 14),
 
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -129,23 +131,36 @@ class ContactDetailPage extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white
+                                          : Colors.black,
                                     ),
                                   ),
-                                  SizedBox(height: 3),
+                                  const SizedBox(height: 3),
                                   Text(
                                     'Leave a tag on their tree',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF837C86),
+                                      color:
+                                          Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? Colors.white70
+                                          : Colors.black54,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
 
-                            const Icon(
+                            Icon(
                               Icons.chevron_right_rounded,
-                              color: Color(0xFFAAA3AC),
+                              color:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white54
+                                  : Colors.black45,
                             ),
                           ],
                         ),
@@ -208,9 +223,20 @@ class ContactDetailPage extends StatelessWidget {
                                 secondary: const _SmallIcon(
                                   Icons.push_pin_rounded,
                                 ),
-                                title: const Text('Pin Conversation'),
+                                title: Text(
+                                  'Pin Conversation',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
+                                ),
                                 value: preferences['pinned'] as bool? ?? false,
-                                activeTrackColor: const Color(0xFFB593E4),
+                                activeTrackColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
                                 onChanged: (value) => _service.setPreference(
                                   current.uid,
                                   'pinned',
@@ -222,9 +248,20 @@ class ContactDetailPage extends StatelessWidget {
                                 secondary: const _SmallIcon(
                                   Icons.notifications_off_rounded,
                                 ),
-                                title: const Text('Mute Notifications'),
+                                title: Text(
+                                  'Mute Notifications',
+                                  style: TextStyle(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
+                                ),
                                 value: preferences['muted'] as bool? ?? false,
-                                activeTrackColor: const Color(0xFFB593E4),
+                                activeTrackColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
                                 onChanged: (value) => _service.setPreference(
                                   current.uid,
                                   'muted',
@@ -308,9 +345,14 @@ class ContactDetailPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'This is private and is never shown to the contact.',
-                style: TextStyle(color: Color(0xFF766F7C), fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(sheetContext).brightness == Brightness.dark
+                      ? Colors.white70
+                      : Colors.black54,
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -323,7 +365,9 @@ class ContactDetailPage extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: hintText,
                   filled: true,
-                  fillColor: const Color(0xFFF7F4FA),
+                  fillColor: Theme.of(
+                    sheetContext,
+                  ).colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -417,7 +461,7 @@ class ContactDetailPage extends StatelessWidget {
           margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Theme.of(sheetContext).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
@@ -501,13 +545,18 @@ class _Header extends StatelessWidget {
       12,
       24,
     ),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFF7DCEA), Color(0xFFDCCCF2)],
+        end: Alignment.topRight,
+        colors: [
+          Theme.of(context).colorScheme.primary.withValues(alpha: .18),
+          Theme.of(context).colorScheme.secondary.withValues(alpha: .13),
+          Theme.of(context).colorScheme.primary.withValues(alpha: .10),
+        ],
+        stops: const [0, 0.5, 1],
       ),
-      borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
     ),
     child: Column(
       children: [
@@ -522,14 +571,21 @@ class _Header extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 54,
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
               backgroundImage: user.photoUrl == null
                   ? null
                   : NetworkImage(user.photoUrl!),
               child: user.photoUrl == null
                   ? Text(
                       user.name[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 34),
+                      style: TextStyle(
+                        fontSize: 34,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                      ),
                     )
                   : null,
             ),
@@ -543,7 +599,10 @@ class _Header extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFF25C77A),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 3,
+                    ),
                   ),
                 ),
               ),
@@ -552,16 +611,34 @@ class _Header extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           user.name,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           user.isOnline ? 'Online' : 'Offline',
-          style: const TextStyle(color: Color(0xFF615968)),
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white70
+                : Colors.black54,
+          ),
         ),
         if (user.bio.trim().isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(user.bio, textAlign: TextAlign.center),
+          Text(
+            user.bio,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
+          ),
         ],
       ],
     ),
@@ -581,7 +658,7 @@ class _MainAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: Colors.white,
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
     borderRadius: BorderRadius.circular(16),
     child: InkWell(
       onTap: onTap,
@@ -590,11 +667,17 @@ class _MainAction extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFF7653A5)),
+            Icon(icon, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 5),
             Text(
               label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
             ),
           ],
         ),
@@ -647,7 +730,9 @@ class _EditablePreferenceTile extends StatelessWidget {
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: hasValue ? const Color(0xFF5F5866) : const Color(0xFF918997),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white70
+              : Colors.black54,
         ),
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
@@ -663,7 +748,7 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(18),
     ),
     child: Column(children: children),
@@ -677,8 +762,17 @@ class _InfoTile extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) =>
-      ListTile(leading: _SmallIcon(icon), title: Text(text));
+  Widget build(BuildContext context) => ListTile(
+    leading: _SmallIcon(icon),
+    title: Text(
+      text,
+      style: TextStyle(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : Colors.black,
+      ),
+    ),
+  );
 }
 
 class _DangerTile extends StatelessWidget {
@@ -717,10 +811,14 @@ class _SmallIcon extends StatelessWidget {
     width: 38,
     height: 38,
     decoration: BoxDecoration(
-      color: const Color(0xFFF0E8FC),
+      color: Theme.of(context).colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(11),
     ),
-    child: Icon(icon, color: const Color(0xFF7653A5), size: 20),
+    child: Icon(
+      icon,
+      color: Theme.of(context).colorScheme.onPrimaryContainer,
+      size: 20,
+    ),
   );
 }
 
@@ -729,5 +827,5 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      const Divider(height: 1, indent: 66, color: Color(0xFFEDE8F0));
+      Divider(height: 1, indent: 66, color: Theme.of(context).dividerColor);
 }
